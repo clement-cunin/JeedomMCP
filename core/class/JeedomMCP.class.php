@@ -11,6 +11,25 @@ class JeedomMCP extends eqLogic {
         return file_exists($pyenv) ? $pyenv : 'python3';
     }
 
+    /**
+     * Generate a cryptographically secure API key and persist it.
+     */
+    public static function generateApiKey() {
+        $key = bin2hex(random_bytes(24)); // 48 hex characters
+        config::save('mcpApiKey', $key, __CLASS__);
+        return $key;
+    }
+
+    /**
+     * Called when the plugin is activated.
+     * Generates an API key if none exists yet.
+     */
+    public static function activate() {
+        if (config::byKey('mcpApiKey', __CLASS__) === '') {
+            self::generateApiKey();
+        }
+    }
+
     public static function dependancy_info() {
         $return = [];
         $return['log'] = log::getPathToLog(__CLASS__ . '_update');
@@ -53,6 +72,10 @@ class JeedomMCP extends eqLogic {
         $deamon_info = self::deamon_info();
         if ($deamon_info['launchable'] != 'ok') {
             throw new Exception(__('Daemon cannot start, reason: ', __FILE__) . $deamon_info['launchable_message']);
+        }
+        // Ensure an API key exists before starting
+        if (config::byKey('mcpApiKey', __CLASS__) === '') {
+            self::generateApiKey();
         }
         $path = realpath(dirname(__FILE__) . '/../../resources/mcp_server');
         $cmd = system::getCmdSudo() . self::getPython3() . ' ' . $path . '/server.py';
