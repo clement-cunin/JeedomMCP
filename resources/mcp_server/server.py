@@ -6,7 +6,6 @@ import os
 
 from fastmcp import FastMCP
 from starlette.middleware import Middleware
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
@@ -14,33 +13,51 @@ from jeedom_client import JeedomClient, JeedomError
 
 logger = logging.getLogger(__name__)
 
+# Paths that do not require API key authentication.
+# OAuth discovery endpoints must be public so MCP clients can reach them.
+_PUBLIC_PATHS = {
+    "/health",
+    "/.well-known/oauth-protected-resource",
+    "/.well-known/oauth-authorization-server",
+    "/.well-known/openid-configuration",
+    "/register",
+}
+
 
 # ---------------------------------------------------------------------------
 # Authentication middleware
 # ---------------------------------------------------------------------------
 
-class APIKeyMiddleware(BaseHTTPMiddleware):
-    """Validate X-API-Key header on every request except /health."""
+class APIKeyMiddleware:
+    """Pure ASGI middleware — validates X-API-Key on every request except public paths.
+
+    BaseHTTPMiddleware buffers responses and breaks SSE streaming, so we use
+    the raw ASGI interface instead.
+    """
 
     def __init__(self, app, api_key: str):
-        super().__init__(app)
+        self.app = app
         self.api_key = api_key
 
-    async def dispatch(self, request: Request, call_next) -> Response:
-        if request.url.path == "/health":
-            return JSONResponse({"status": "ok"})
-        key = request.headers.get("X-API-Key", "")
-        if key != self.api_key:
-            logger.warning("Unauthorized request from %s", request.client)
-            return JSONResponse({"error": "Unauthorized"}, status_code=401)
-        return await call_next(request)
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            path = scope.get("path", "")
+            if path not in _PUBLIC_PATHS:
+                headers = dict(scope.get("headers", []))
+                key = headers.get(b"x-api-key", b"").decode()
+                if key != self.api_key:
+                    logger.warning("Unauthorized request to %s", path)
+                    response = JSONResponse({"error": "Unauthorized"}, status_code=401)
+                    await response(scope, receive, send)
+                    return
+        await self.app(scope, receive, send)
 
 
 # ---------------------------------------------------------------------------
 # MCP server
 # ---------------------------------------------------------------------------
 
-def build_mcp(jeedom: JeedomClient) -> FastMCP:
+def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
     mcp = FastMCP(
         name="JeedomMCP",
         instructions=(
@@ -51,6 +68,32 @@ def build_mcp(jeedom: JeedomClient) -> FastMCP:
             "and list_scenarios / run_scenario for automation scenarios."
         ),
     )
+
+    # ------------------------------------------------------------------
+    # Public endpoints (no auth required)
+    # ------------------------------------------------------------------
+
+    @mcp.custom_route("/health", methods=["GET"], include_in_schema=False)
+    async def health(request: Request) -> Response:
+        return JSONResponse({"status": "ok"})
+
+    @mcp.custom_route(
+        "/.well-known/oauth-protected-resource", methods=["GET"], include_in_schema=False
+    )
+    async def oauth_protected_resource(request: Request) -> Response:
+        # Return minimal resource metadata with no authorization_servers so
+        # MCP clients that support pre-configured API keys can skip OAuth.
+        return JSONResponse({"resource": base_url})
+
+    @mcp.custom_route(
+        "/.well-known/oauth-authorization-server", methods=["GET"], include_in_schema=False
+    )
+    @mcp.custom_route(
+        "/.well-known/openid-configuration", methods=["GET"], include_in_schema=False
+    )
+    @mcp.custom_route("/register", methods=["GET", "POST"], include_in_schema=False)
+    async def oauth_not_supported(request: Request) -> Response:
+        return JSONResponse({"error": "OAuth not supported"}, status_code=404)
 
     @mcp.tool()
     def list_devices() -> list[dict]:
@@ -150,6 +193,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--pid", type=str)
     parser.add_argument("--apikey", type=str, required=True, help="MCP API key for clients")
+    parser.add_argument("--base_url", type=str, default="", help="Public base URL of the MCP server (e.g. https://example.com/mcp)")
     parser.add_argument("--jeedom_url", type=str, required=True, help="Jeedom internal API URL")
     parser.add_argument("--jeedom_apikey", type=str, required=True, help="Jeedom API key")
     parser.add_argument("--loglevel", type=str, default="error")
@@ -169,7 +213,7 @@ def main() -> None:
         write_pid(args.pid)
 
     jeedom = JeedomClient(url=args.jeedom_url, apikey=args.jeedom_apikey)
-    mcp = build_mcp(jeedom)
+    mcp = build_mcp(jeedom, base_url=args.base_url)
 
     logger.info("JeedomMCP starting on port %d", args.port)
 
