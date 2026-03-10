@@ -2,12 +2,23 @@
 
 class JeedomMCP extends eqLogic {
 
+    /**
+     * Return the path to the python3 executable.
+     * Prefers pyenv shim, falls back to system python3.
+     */
+    private static function getPython3() {
+        $pyenv = '/home/pi/.pyenv/shims/python3';
+        return file_exists($pyenv) ? $pyenv : 'python3';
+    }
+
     public static function dependancy_info() {
         $return = [];
         $return['log'] = log::getPathToLog(__CLASS__ . '_update');
         $return['progress_file'] = jeedom::getTmpFolder(__CLASS__) . '/dependancy';
         $return['state'] = 'ok';
-        if (exec(system::getCmdSudo() . system::get('cmd_check') . '-q --installed python3-requests 2>&1') == '') {
+        $python3 = self::getPython3();
+        exec($python3 . ' -c "import fastmcp, requests" 2>&1', $output, $rc);
+        if ($rc !== 0) {
             $return['state'] = 'nok';
         }
         return $return;
@@ -43,9 +54,8 @@ class JeedomMCP extends eqLogic {
         if ($deamon_info['launchable'] != 'ok') {
             throw new Exception(__('Daemon cannot start, reason: ', __FILE__) . $deamon_info['launchable_message']);
         }
-        $plugin = plugin::byId(__CLASS__);
         $path = realpath(dirname(__FILE__) . '/../../resources/mcp_server');
-        $cmd = system::get('cmd_sudo') . config::byKey('python3_path') . ' ' . $path . '/server.py';
+        $cmd = system::getCmdSudo() . self::getPython3() . ' ' . $path . '/server.py';
         $cmd .= ' --loglevel ' . ($_debug ? 'debug' : 'error');
         $cmd .= ' --pid ' . jeedom::getTmpFolder(__CLASS__) . '/deamon.pid';
         $cmd .= ' --port ' . config::byKey('port', __CLASS__, 8765);

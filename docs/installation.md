@@ -77,16 +77,12 @@ Add the following block **inside your HTTPS `VirtualHost`**, in the Jeedom Apach
 
 ```apache
 # JeedomMCP — MCP server reverse proxy
-ProxyPass /mcp/ http://127.0.0.1:8765/mcp/
-ProxyPassReverse /mcp/ http://127.0.0.1:8765/mcp/
-
-# Required for SSE (Server-Sent Events)
+# The /mcp/ prefix is stripped before forwarding to the Python server
 <Location /mcp/>
-    ProxyPreserveHost On
-    RequestHeader set X-Forwarded-Proto "https"
-    SetEnv proxy-nokeepalive 1
-    SetEnv proxy-sendchunks 1
-    SetEnv force-proxy-request-1.0 0
+    ProxyPass http://127.0.0.1:8765/ flushpackets=on
+    ProxyPassReverse http://127.0.0.1:8765/
+    RequestHeader set Connection ""
+    SetEnv proxy-initial-not-buffered 1
 </Location>
 ```
 
