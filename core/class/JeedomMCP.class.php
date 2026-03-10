@@ -12,6 +12,17 @@ class JeedomMCP extends eqLogic {
     }
 
     /**
+     * Convert a Jeedom/Monolog numeric log level to a Python logging level name.
+     * Jeedom uses Monolog constants: 100=DEBUG, 200=INFO, 300=WARNING, 400=ERROR.
+     */
+    private static function toPythonLogLevel($jeedomLevel) {
+        if ($jeedomLevel <= 100) return 'debug';
+        if ($jeedomLevel <= 200) return 'info';
+        if ($jeedomLevel <= 300) return 'warning';
+        return 'error';
+    }
+
+    /**
      * Generate a cryptographically secure API key and persist it.
      */
     public static function generateApiKey() {
@@ -79,7 +90,7 @@ class JeedomMCP extends eqLogic {
         }
         $path = realpath(dirname(__FILE__) . '/../../resources/mcp_server');
         $cmd = system::getCmdSudo() . self::getPython3() . ' ' . $path . '/server.py';
-        $cmd .= ' --loglevel ' . ($_debug ? 'debug' : 'error');
+        $cmd .= ' --loglevel ' . ($_debug ? 'debug' : self::toPythonLogLevel(log::getLogLevel(__CLASS__)));
         $cmd .= ' --pid ' . jeedom::getTmpFolder(__CLASS__) . '/deamon.pid';
         $cmd .= ' --port ' . config::byKey('port', __CLASS__, 8765);
         $cmd .= ' --apikey ' . config::byKey('mcpApiKey', __CLASS__);

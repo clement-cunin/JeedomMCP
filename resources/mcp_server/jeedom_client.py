@@ -24,13 +24,17 @@ class JeedomClient:
 
     def _call(self, params: dict) -> Any:
         params["apikey"] = self.apikey
+        logger.debug("Jeedom API call: url=%s type=%s action=%s", self.url, params.get("type"), params.get("action"))
         try:
             resp = self.session.post(self.url, json=params, timeout=10)
+            logger.debug("Jeedom API response: status=%d body=%s", resp.status_code, resp.text[:500])
             resp.raise_for_status()
             data = resp.json()
             if isinstance(data, dict) and data.get("state") == "error":
                 raise JeedomError(f"Jeedom API error: {data.get('result')}")
-            return data.get("result", data)
+            result = data.get("result", data)
+            logger.debug("Jeedom API result type=%s len=%s", type(result).__name__, len(result) if isinstance(result, list) else "n/a")
+            return result
         except requests.RequestException as exc:
             raise JeedomError(f"Jeedom API unreachable: {exc}") from exc
 

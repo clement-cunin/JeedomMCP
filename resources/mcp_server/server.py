@@ -212,10 +212,32 @@ def main() -> None:
     if args.pid:
         write_pid(args.pid)
 
+    # Always log startup parameters regardless of loglevel
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
+    logging.info("=== JeedomMCP starting ===")
+    logging.info("port       : %d", args.port)
+    logging.info("base_url   : %s", args.base_url)
+    logging.info("jeedom_url : %s", args.jeedom_url)
+    logging.info("apikey     : %s...%s", args.apikey[:4], args.apikey[-4:])
+    logging.info("jeedom_key : %s...%s", args.jeedom_apikey[:4], args.jeedom_apikey[-4:])
+    logging.info("loglevel   : %s", args.loglevel)
+    root_logger.setLevel(getattr(logging, args.loglevel.upper(), logging.ERROR))
+
     jeedom = JeedomClient(url=args.jeedom_url, apikey=args.jeedom_apikey)
+
+    # Connectivity check — always logged regardless of loglevel
+    root_logger.setLevel(logging.DEBUG)
+    try:
+        equipment = jeedom.get_all_equipment()
+        logging.info("Jeedom API check OK — %d equipment found", len(equipment))
+    except Exception as exc:
+        logging.error("Jeedom API check FAILED: %s", exc)
+    root_logger.setLevel(getattr(logging, args.loglevel.upper(), logging.ERROR))
+
     mcp = build_mcp(jeedom, base_url=args.base_url)
 
-    logger.info("JeedomMCP starting on port %d", args.port)
+    logging.info("JeedomMCP listening on port %d", args.port)
 
     mcp.run(
         transport="sse",
