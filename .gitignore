@@ -10,19 +10,8 @@ build/
 .venv/
 venv/
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Environment
-.env
-.env.local
+# IDE, OS, environment, local config (all dotfiles/dotdirs)
+.*
 
 # Dev tools (local only)
 deploy.sh
