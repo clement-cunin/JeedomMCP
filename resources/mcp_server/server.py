@@ -4,6 +4,7 @@ import argparse
 import logging
 import os
 
+import fastmcp as _fastmcp
 from fastmcp import FastMCP
 from starlette.middleware import Middleware
 from starlette.requests import Request
@@ -207,43 +208,51 @@ def write_pid(path: str) -> None:
 
 def main() -> None:
     args = parse_args()
-    logging.basicConfig(level=getattr(logging, args.loglevel.upper(), logging.ERROR))
+    logging.basicConfig(
+        level=getattr(logging, args.loglevel.upper(), logging.ERROR),
+        format="[%(asctime)s] %(levelname)-8s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    # Route FastMCP logs through our root logger instead of its own RichHandler
+    _fastmcp.settings.log_enabled = False
+    _fmcp_logger = logging.getLogger("fastmcp")
+    _fmcp_logger.handlers.clear()
+    _fmcp_logger.propagate = True
 
+    log = logging.getLogger("Startup")
     if args.pid:
         write_pid(args.pid)
 
-    # Always log startup parameters regardless of loglevel
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG)
-    logging.info("=== JeedomMCP starting ===")
-    logging.info("port       : %d", args.port)
-    logging.info("base_url   : %s", args.base_url)
-    logging.info("jeedom_url : %s", args.jeedom_url)
-    logging.info("apikey     : %s...%s", args.apikey[:4], args.apikey[-4:])
-    logging.info("jeedom_key : %s...%s", args.jeedom_apikey[:4], args.jeedom_apikey[-4:])
-    logging.info("loglevel   : %s", args.loglevel)
-    root_logger.setLevel(getattr(logging, args.loglevel.upper(), logging.ERROR))
+    log.info("=== JeedomMCP starting ===")
+    log.info("- pid        : %d", os.getpid())
+    log.info("- port       : %d", args.port)
+    log.info("- base_url   : %s", args.base_url)
+    log.info("- jeedom_url : %s", args.jeedom_url)
+    log.info("- apikey     : %s...%s", args.apikey[:4], args.apikey[-4:])
+    log.info("- jeedom_key : %s...%s", args.jeedom_apikey[:4], args.jeedom_apikey[-4:])
+    log.info("- loglevel   : %s", args.loglevel)
+    log.info("==========================")
 
     jeedom = JeedomClient(url=args.jeedom_url, apikey=args.jeedom_apikey)
 
-    # Connectivity check — always logged regardless of loglevel
-    root_logger.setLevel(logging.DEBUG)
     try:
         equipment = jeedom.get_all_equipment()
-        logging.info("Jeedom API check OK — %d equipment found", len(equipment))
+        if len(equipment)>0:
+            log.info("Jeedom API check complete - %d equipment found", len(equipment))
+        else:
+            log.warning("Jeedom API check - no equipment found")
     except Exception as exc:
-        logging.error("Jeedom API check FAILED: %s", exc)
-    root_logger.setLevel(getattr(logging, args.loglevel.upper(), logging.ERROR))
+        log.error("Jeedom API check FAILED: %s", exc)
 
     mcp = build_mcp(jeedom, base_url=args.base_url)
-
-    logging.info("JeedomMCP listening on port %d", args.port)
 
     mcp.run(
         transport="sse",
         host="127.0.0.1",
         port=args.port,
         middleware=[Middleware(APIKeyMiddleware, api_key=args.apikey)],
+        show_banner=False,
+        uvicorn_config={"log_config": None},
     )
 
 
