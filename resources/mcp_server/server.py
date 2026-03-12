@@ -119,6 +119,7 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
             {
                 "id": int(eq["id"]),
                 "name": eq.get("name", ""),
+                "description": eq.get("comment", "") or None,
                 "object_id": eq.get("object_id"),
                 "object_name": objects.get(str(eq.get("object_id", ""))) or None,
                 "category": eq.get("category", ""),
@@ -143,6 +144,7 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
         return {
             "equipment_id": equipment_id,
             "name": eq.get("name", ""),
+            "description": eq.get("comment", "") or None,
             "commands": [
                 {
                     "id": int(cmd["id"]),
@@ -197,6 +199,7 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
             result.append({
                 "id": int(eq["id"]),
                 "name": eq.get("name", ""),
+                "description": eq.get("comment", "") or None,
                 "object_name": objects.get(str(eq.get("object_id", ""))) or None,
                 "category": eq.get("category", ""),
                 "is_visible": eq.get("isVisible") == "1",
