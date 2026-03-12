@@ -19,6 +19,9 @@ class JeedomClient:
     def __init__(self, url: str, apikey: str):
         self.url = url
         self.apikey = apikey
+        # Derive the plugin ajax URL from the jeeApi URL
+        base = url.rsplit('/core/api/', 1)[0]
+        self.ajax_url = base + '/plugins/JeedomMCP/core/ajax/JeedomMCP.ajax.php'
         self._req_id = 0
         self.session = requests.Session()
         # Disable SSL verification for local loopback calls
@@ -100,6 +103,39 @@ class JeedomClient:
     # Scenarios
     # ------------------------------------------------------------------
 
+    def get_scenario_actions(self, scenario_id: int) -> dict | None:
+        """Return the full exported scenario including its elements and actions."""
+        result = self._call("scenario::export", {"id": scenario_id})
+        if not isinstance(result, dict):
+            return None
+        return result.get("export")
+
+    def set_scenario_actions(self, scenario_id: int, elements: list) -> Any:
+        """Replace the action elements of an existing scenario."""
+        return self._call("scenario::import", {"id": scenario_id, "import": {"elements": elements}})
+
+    def delete_scenario(self, scenario_id: int) -> None:
+        """Delete a scenario via the plugin ajax endpoint."""
+        start_time = time.monotonic()
+        try:
+            resp = self.session.post(
+                self.ajax_url,
+                data={"action": "deleteScenario", "scenario_id": scenario_id, "apikey": self.apikey},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            elapsed = (time.monotonic() - start_time) * 1000
+            if data.get("state") != "ok":
+                msg = f"deleteScenario error: {data.get('result', 'unknown error')}"
+                logger.error(msg)
+                raise JeedomError(msg)
+            logger.info(f"deleteScenario completed in {elapsed:.0f}ms")
+        except requests.RequestException as exc:
+            msg = f"Jeedom API unreachable: {exc}"
+            logger.error(msg)
+            raise JeedomError(msg) from exc
+
     def get_all_scenarios(self) -> list[dict]:
         """Return all scenarios from Jeedom."""
         result = self._call("scenario::all")
@@ -112,3 +148,51 @@ class JeedomClient:
     def set_scenario_description(self, scenario_id: int, description: str) -> Any:
         """Update the description field of a scenario."""
         return self._call("scenario::save", {"id": scenario_id, "description": description})
+
+    def update_scenario(
+        self,
+        scenario_id: int,
+        name: str | None = None,
+        mode: str | None = None,
+        schedule: str | None = None,
+        trigger: list[str] | None = None,
+        is_active: bool | None = None,
+        description: str | None = None,
+    ) -> Any:
+        """Update fields of an existing scenario."""
+        params: dict = {"id": scenario_id}
+        if name is not None:
+            params["name"] = name
+        if mode is not None:
+            params["mode"] = mode
+        if schedule is not None:
+            params["schedule"] = schedule
+        if trigger is not None:
+            params["trigger"] = trigger
+        if is_active is not None:
+            params["isActive"] = "1" if is_active else "0"
+        if description is not None:
+            params["description"] = description
+        return self._call("scenario::save", params)
+
+    def create_scenario(
+        self,
+        name: str,
+        mode: str,
+        schedule: str | None = None,
+        trigger: list[str] | None = None,
+        is_active: bool = True,
+        description: str = "",
+    ) -> Any:
+        """Create a new scenario."""
+        params: dict = {
+            "name": name,
+            "mode": mode,
+            "isActive": "1" if is_active else "0",
+            "description": description,
+        }
+        if schedule is not None:
+            params["schedule"] = schedule
+        if trigger is not None:
+            params["trigger"] = trigger
+        return self._call("scenario::save", params)

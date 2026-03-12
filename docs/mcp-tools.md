@@ -141,6 +141,72 @@ Lists all Jeedom scenarios.
 
 ---
 
+## `get_scenario_actions`
+
+Gets the full action blocks of a Jeedom scenario (elements, sub-elements, expressions).
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `scenario_id` | int | yes | Scenario ID (from `list_scenarios`) |
+
+**Returns**:
+
+```json
+{
+  "scenario_id": 3,
+  "elements": [
+    {
+      "type": "action",
+      "order": "0",
+      "subElements": [
+        {
+          "type": "action",
+          "subtype": "action",
+          "expressions": [
+            {
+              "type": "action",
+              "expression": "#[Entrée][Couloir][Mode Jour]#",
+              "options": { "enable": "1", "background": "0" },
+              "order": "0"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `elements` | Top-level blocks of the scenario |
+| `subElements` | Action or condition groups within a block |
+| `expressions` | Individual actions or conditions within a group |
+| `expression` | Jeedom tag (`#[room][device][cmd]#`), code snippet, or condition |
+
+---
+
+## `set_scenario_actions`
+
+Replaces the action blocks of a Jeedom scenario. The `elements` structure mirrors the output of `get_scenario_actions`.
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `scenario_id` | int | yes | Scenario ID (from `list_scenarios`) |
+| `elements` | object[] | yes | Full list of action blocks to save (replaces existing blocks) |
+
+**Returns**:
+
+```json
+{ "success": true, "scenario_id": 3 }
+```
+
+---
+
 ## `set_scenario_description`
 
 Sets the description of a Jeedom scenario.
@@ -156,6 +222,83 @@ Sets the description of a Jeedom scenario.
 
 ```json
 { "success": true, "scenario_id": 5, "description": "Turns off all lights and locks doors at bedtime" }
+```
+
+---
+
+## `update_scenario`
+
+Updates fields of an existing Jeedom scenario. Only provided fields are modified.
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `scenario_id` | int | yes | Scenario ID (from `list_scenarios`) |
+| `name` | string | no | New display name |
+| `mode` | string | no | `schedule`, `provoke`, or `always` |
+| `schedule` | string | no | Cron expression (for schedule mode) |
+| `trigger` | string[] | no | Trigger conditions (for provoke mode) |
+| `is_active` | bool | no | Enable or disable the scenario |
+| `description` | string | no | Description of the scenario's purpose |
+
+**Returns**:
+
+```json
+{ "success": true, "scenario_id": 5 }
+```
+
+---
+
+## `create_scenario`
+
+Creates a new Jeedom scenario.
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | yes | Display name of the scenario |
+| `mode` | string | yes | `schedule` (cron-based), `provoke` (trigger-based), or `always` |
+| `schedule` | string | no | Cron expression — required when `mode` is `schedule` |
+| `trigger` | string[] | no | Trigger conditions (command IDs or expressions) — used when `mode` is `provoke` |
+| `is_active` | bool | no | Whether the scenario is active (default: `true`) |
+| `description` | string | no | Description of the scenario's purpose |
+
+**Returns**:
+
+```json
+{
+  "success": true,
+  "id": 12,
+  "name": "Morning routine",
+  "group": null,
+  "description": "",
+  "is_active": true,
+  "state": null,
+  "mode": "schedule",
+  "schedule": "30 7 * * *",
+  "trigger": null,
+  "last_launch": null
+}
+```
+
+---
+
+## `delete_scenario`
+
+Permanently deletes a Jeedom scenario.
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `scenario_id` | int | yes | Scenario ID (from `list_scenarios`) |
+
+**Returns**:
+
+```json
+{ "success": true, "scenario_id": 12 }
 ```
 
 ---

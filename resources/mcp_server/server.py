@@ -96,6 +96,20 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
     async def oauth_not_supported(request: Request) -> Response:
         return JSONResponse({"error": "OAuth not supported"}, status_code=404)
 
+    def _fmt_scenario(s: dict) -> dict:
+        return {
+            "id": int(s["id"]),
+            "name": s.get("name", ""),
+            "group": s.get("group", "") or None,
+            "description": s.get("description", "") or None,
+            "is_active": s.get("isActive") == "1",
+            "state": s.get("state", "") or None,
+            "mode": s.get("mode", ""),
+            "schedule": s.get("schedule") or None,
+            "trigger": [t for t in (s.get("trigger") or []) if t] or None,
+            "last_launch": s.get("lastLaunch", "") or None,
+        }
+
     @mcp.tool()
     def list_devices() -> list[dict]:
         """List all enabled Jeedom equipment."""
@@ -220,6 +234,49 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
         ]
 
     @mcp.tool()
+    def delete_scenario(scenario_id: int) -> dict:
+        """Delete a Jeedom scenario permanently.
+
+        Args:
+            scenario_id: Scenario ID obtained from list_scenarios.
+        """
+        try:
+            jeedom.delete_scenario(scenario_id)
+            return {"success": True, "scenario_id": scenario_id}
+        except JeedomError as exc:
+            return {"error": str(exc)}
+
+    @mcp.tool()
+    def get_scenario_actions(scenario_id: int) -> dict:
+        """Get the full action blocks of a Jeedom scenario (elements, sub-elements, expressions).
+
+        Args:
+            scenario_id: Scenario ID obtained from list_scenarios.
+        """
+        result = jeedom.get_scenario_actions(scenario_id)
+        if result is None:
+            return {"error": f"Scenario {scenario_id} not found"}
+        return {"scenario_id": scenario_id, "elements": result.get("elements", [])}
+
+    @mcp.tool()
+    def set_scenario_actions(scenario_id: int, elements: list[dict]) -> dict:
+        """Replace the action blocks of a Jeedom scenario.
+
+        The elements structure mirrors the output of get_scenario_actions.
+        Each element has a type, order, and subElements list; each subElement
+        has expressions with the actual action commands or conditions.
+
+        Args:
+            scenario_id: Scenario ID obtained from list_scenarios.
+            elements: Full list of action blocks to save (replaces existing blocks).
+        """
+        try:
+            jeedom.set_scenario_actions(scenario_id, elements)
+            return {"success": True, "scenario_id": scenario_id}
+        except JeedomError as exc:
+            return {"error": str(exc)}
+
+    @mcp.tool()
     def set_scenario_description(scenario_id: int, description: str) -> dict:
         """Set the description of a Jeedom scenario.
 
@@ -231,6 +288,60 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
             result = jeedom.set_scenario_description(scenario_id, description)
             saved_description = result.get("description") if isinstance(result, dict) else description
             return {"success": True, "scenario_id": scenario_id, "description": saved_description}
+        except JeedomError as exc:
+            return {"error": str(exc)}
+
+    @mcp.tool()
+    def update_scenario(
+        scenario_id: int,
+        name: str | None = None,
+        mode: str | None = None,
+        schedule: str | None = None,
+        trigger: list[str] | None = None,
+        is_active: bool | None = None,
+        description: str | None = None,
+    ) -> dict:
+        """Update fields of an existing Jeedom scenario. Only provided fields are modified.
+
+        Args:
+            scenario_id: Scenario ID obtained from list_scenarios.
+            name: New display name.
+            mode: Execution mode — 'schedule', 'provoke', or 'always'.
+            schedule: Cron expression (for schedule mode).
+            trigger: List of trigger conditions (for provoke mode).
+            is_active: Enable or disable the scenario.
+            description: Description of the scenario's purpose.
+        """
+        try:
+            jeedom.update_scenario(scenario_id, name, mode, schedule, trigger, is_active, description)
+            return {"success": True, "scenario_id": scenario_id}
+        except JeedomError as exc:
+            return {"error": str(exc)}
+
+    @mcp.tool()
+    def create_scenario(
+        name: str,
+        mode: str,
+        schedule: str | None = None,
+        trigger: list[str] | None = None,
+        is_active: bool = True,
+        description: str = "",
+    ) -> dict:
+        """Create a new Jeedom scenario.
+
+        Args:
+            name: Display name of the scenario.
+            mode: Execution mode — 'schedule' (cron-based), 'provoke' (trigger-based), or 'always'.
+            schedule: Cron expression, required when mode is 'schedule'.
+            trigger: List of trigger conditions (command IDs or expressions), used when mode is 'provoke'.
+            is_active: Whether the scenario is active (default: True).
+            description: Optional description of the scenario's purpose.
+        """
+        try:
+            result = jeedom.create_scenario(name, mode, schedule, trigger, is_active, description)
+            if not isinstance(result, dict) or "id" not in result:
+                return {"error": "Scenario creation failed: no ID returned"}
+            return {"success": True, **_fmt_scenario(result)}
         except JeedomError as exc:
             return {"error": str(exc)}
 
