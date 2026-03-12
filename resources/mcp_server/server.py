@@ -220,6 +220,21 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
         ]
 
     @mcp.tool()
+    def set_scenario_description(scenario_id: int, description: str) -> dict:
+        """Set the description of a Jeedom scenario.
+
+        Args:
+            scenario_id: Scenario ID obtained from list_scenarios.
+            description: Description text explaining the scenario's purpose.
+        """
+        try:
+            result = jeedom.set_scenario_description(scenario_id, description)
+            saved_description = result.get("description") if isinstance(result, dict) else description
+            return {"success": True, "scenario_id": scenario_id, "description": saved_description}
+        except JeedomError as exc:
+            return {"error": str(exc)}
+
+    @mcp.tool()
     def run_scenario(scenario_id: int) -> dict:
         """Trigger a Jeedom scenario.
 

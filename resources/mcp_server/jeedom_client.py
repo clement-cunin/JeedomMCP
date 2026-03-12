@@ -108,3 +108,7 @@ class JeedomClient:
     def run_scenario(self, scenario_id: int) -> Any:
         """Trigger a scenario."""
         return self._call("scenario::changeState", {"id": scenario_id, "state": "run"})
+
+    def set_scenario_description(self, scenario_id: int, description: str) -> Any:
+        """Update the description field of a scenario."""
+        return self._call("scenario::save", {"id": scenario_id, "description": description})
