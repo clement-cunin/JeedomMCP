@@ -20,7 +20,6 @@ Lists all enabled Jeedom equipment.
     "object_id": "12",
     "object_name": "Living room",
     "category": "light",
-    "is_enable": true,
     "is_visible": true
   }
 ]
@@ -49,6 +48,36 @@ Gets the current state of a specific equipment and all its info commands.
     { "id": 102, "name": "Brightness", "logicalId": "brightness", "value": "75" }
   ]
 }
+```
+
+---
+
+## `get_all_states`
+
+Gets the current state of all equipment and their commands in a single call (3 API requests total).
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `equipment_ids` | int[] | no | Filter to specific equipment IDs. If omitted, returns all enabled equipment. |
+
+**Returns**: JSON array of equipment with their commands and current values
+
+```json
+[
+  {
+    "id": 42,
+    "name": "Living room light",
+    "object_name": "Living room",
+    "category": "light",
+    "is_visible": true,
+    "commands": [
+      { "id": 101, "name": "State", "logicalId": "state", "type": "info", "subType": "binary", "value": "1" },
+      { "id": 103, "name": "On", "logicalId": "on", "type": "action", "subType": "other", "value": null }
+    ]
+  }
+]
 ```
 
 ---

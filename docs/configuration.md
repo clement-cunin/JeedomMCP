@@ -8,6 +8,7 @@ Accessible via **Plugins → Home automation → JeedomMCP**.
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
+| **Transport mode** | `http` | MCP transport: `Streamable HTTP` (recommended, stateless) or `SSE` (legacy, requires client reconnection after daemon restart). |
 | **MCP server port** | `8765` | TCP port the Python daemon listens on (loopback only). Must match the Apache2 reverse proxy config. |
 | **MCP API key** | *(auto-generated)* | Authentication key to provide in your MCP client config. Can be regenerated via the ↺ button. |
 
@@ -20,8 +21,10 @@ The Python daemon is launched by Jeedom with the following arguments (managed au
 | Argument | Type | Description |
 |----------|------|-------------|
 | `--loglevel` | string | Log level: `debug`, `info`, `warning`, `error` |
-| `--port` | int | MCP SSE server port (default: `8765`) |
+| `--transport` | string | MCP transport: `http` (default) or `sse` |
+| `--port` | int | MCP server port (default: `8765`) |
 | `--apikey` | string | MCP authentication key for clients |
+| `--base_url` | string | Public base URL of the MCP server (e.g. `https://example.com/mcp`) |
 | `--jeedom_url` | string | Jeedom internal API URL |
 | `--jeedom_apikey` | string | Jeedom API key (for internal API calls) |
 | `--pid` | string | PID file path |
@@ -49,14 +52,16 @@ Add the following block inside the HTTPS `VirtualHost` in `/etc/apache2/sites-en
 
 ## MCP client configuration
 
-### `.mcp.json` (recommended, per project)
+The plugin configuration page generates a ready-to-copy `.mcp.json` snippet based on your current transport and API key.
+
+### Streamable HTTP (default)
 
 ```json
 {
   "mcpServers": {
     "jeedom": {
-      "type": "sse",
-      "url": "https://your-jeedom.duckdns.org/mcp/sse",
+      "type": "http",
+      "url": "https://your-jeedom.duckdns.org/mcp/mcp",
       "headers": {
         "X-API-Key": "YOUR_MCP_API_KEY"
       }
@@ -65,7 +70,7 @@ Add the following block inside the HTTPS `VirtualHost` in `/etc/apache2/sites-en
 }
 ```
 
-### `~/.claude/claude_desktop_config.json` (global)
+### SSE (legacy)
 
 ```json
 {
