@@ -1,4 +1,4 @@
-"""Jeedom internal API client."""
+"""Jeedom internal API client (JSON-RPC 2.0)."""
 
 import logging
 from typing import Any
@@ -13,36 +13,41 @@ class JeedomError(Exception):
 
 
 class JeedomClient:
-    """Thin wrapper around the Jeedom JSON-RPC internal API."""
+    """Thin wrapper around the Jeedom JSON-RPC 2.0 internal API."""
 
     def __init__(self, url: str, apikey: str):
         self.url = url
         self.apikey = apikey
+        self._req_id = 0
         self.session = requests.Session()
         # Disable SSL verification for local loopback calls
         self.session.verify = False
 
-    def _call(self, params: dict) -> Any:
-        logger.debug("POST %s %s", self.url, params)
-        params["apikey"] = self.apikey
+    def _call(self, method: str, params: dict | None = None) -> Any:
+        self._req_id += 1
+        payload = {
+            "jsonrpc": "2.0",
+            "method": method,
+            "params": {"apikey": self.apikey, **(params or {})},
+            "id": self._req_id,
+        }
+        logger.debug("POST %s method=%s params=%s", self.url, method, params)
         resp = None
         try:
-            # Send as form-encoded data — Jeedom's jeeApi.php reads individual POST fields,
-            # not a JSON-RPC 2.0 body.
-            resp = self.session.post(self.url, data=params, timeout=10)
+            resp = self.session.post(self.url, json=payload, timeout=10)
             logger.debug("Jeedom API response: status=%d body=%s", resp.status_code, resp.text[:500])
             resp.raise_for_status()
             data = resp.json()
-            if isinstance(data, dict) and data.get("state") == "error":
-                msg = f"Jeedom API error: {data.get('result')}"
+            if "error" in data:
+                msg = f"Jeedom API error: {data['error']}"
                 logger.error(msg)
                 raise JeedomError(msg)
-            result = data.get("result", data) if isinstance(data, dict) else data
+            result = data.get("result")
             logger.debug("Jeedom API result type=%s len=%s", type(result).__name__, len(result) if isinstance(result, list) else "n/a")
             return result
         except requests.exceptions.JSONDecodeError as exc:
             body = resp.text[:500] if resp is not None else "<no response>"
-            msg = f"Jeedom API returned non-JSON (status={resp.status_code}): {body!r}"
+            msg = f"Jeedom API returned non-JSON (status={resp.status_code if resp else '?'}): {body!r}"
             logger.error(msg)
             raise JeedomError(msg) from exc
         except requests.RequestException as exc:
@@ -56,24 +61,24 @@ class JeedomClient:
 
     def get_all_equipment(self) -> list[dict]:
         """Return all equipment (eqLogic) from Jeedom."""
-        result = self._call({"type": "eqLogic", "action": "getAll"})
+        result = self._call("eqLogic::all")
         return result if isinstance(result, list) else []
 
     def get_equipment(self, equipment_id: int) -> dict | None:
         """Return a single equipment by ID."""
-        return self._call({"type": "eqLogic", "action": "get", "id": equipment_id})
+        return self._call("eqLogic::byId", {"id": equipment_id})
 
     def get_commands(self, equipment_id: int) -> list[dict]:
         """Return all commands for a given equipment."""
-        result = self._call({"type": "cmd", "action": "getAll", "eqLogic_id": equipment_id})
+        result = self._call("cmd::byEqLogicId", {"eqLogic_id": equipment_id})
         return result if isinstance(result, list) else []
 
     def exec_command(self, command_id: int, value: str | None = None) -> Any:
         """Execute an action command."""
-        params: dict = {"type": "cmd", "action": "execCmd", "id": command_id}
+        params: dict = {"id": command_id}
         if value is not None:
-            params["value"] = value
-        return self._call(params)
+            params["options"] = {"slider": value}
+        return self._call("cmd::execCmd", params)
 
     # ------------------------------------------------------------------
     # Scenarios
@@ -81,14 +86,9 @@ class JeedomClient:
 
     def get_all_scenarios(self) -> list[dict]:
         """Return all scenarios from Jeedom."""
-        result = self._call({"type": "scenario", "action": "getAll"})
+        result = self._call("scenario::all")
         return result if isinstance(result, list) else []
 
     def run_scenario(self, scenario_id: int) -> Any:
         """Trigger a scenario."""
-        return self._call({
-            "type": "scenario",
-            "action": "changeState",
-            "id": scenario_id,
-            "state": "start",
-        })
+        return self._call("scenario::changeState", {"id": scenario_id, "state": "run"})

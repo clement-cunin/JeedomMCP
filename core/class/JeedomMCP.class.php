@@ -96,7 +96,7 @@ class JeedomMCP extends eqLogic {
         $cmd .= ' --apikey ' . config::byKey('mcpApiKey', __CLASS__);
         $cmd .= ' --base_url ' . network::getNetworkAccess('external', 'proto:ip:port:comp') . '/mcp';
         $cmd .= ' --jeedom_url ' . network::getNetworkAccess('internal', 'proto:127.0.0.1:port:comp') . '/core/api/jeeApi.php';
-        $cmd .= ' --jeedom_apikey ' . jeedom::getApiKey(__CLASS__);
+        $cmd .= ' --jeedom_apikey ' . jeedom::getApiKey();
         log::add(__CLASS__, 'info', 'Launching daemon: ' . $cmd);
         $result = exec($cmd . ' >> ' . log::getPathToLog(__CLASS__) . ' 2>&1 &');
         $i = 0;
