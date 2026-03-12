@@ -211,7 +211,7 @@ def main() -> None:
     args = parse_args()
     logging.basicConfig(
         level=getattr(logging, args.loglevel.upper(), logging.ERROR),
-        format="[%(asctime)s] %(levelname)-8s %(message)s",
+        format="[%(asctime)s][%(levelname)s] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
     # Route FastMCP logs through our root logger instead of its own RichHandler
