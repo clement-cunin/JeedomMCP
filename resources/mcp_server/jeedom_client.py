@@ -1,6 +1,7 @@
 """Jeedom internal API client (JSON-RPC 2.0)."""
 
 import logging
+import time
 from typing import Any
 
 import requests
@@ -33,6 +34,7 @@ class JeedomClient:
         }
         logger.debug("POST %s method=%s params=%s", self.url, method, params)
         resp = None
+        start_time = time.monotonic()
         try:
             resp = self.session.post(self.url, json=payload, timeout=10)
             logger.debug("Jeedom API response: status=%d body=%s", resp.status_code, resp.text[:500])
@@ -43,7 +45,9 @@ class JeedomClient:
                 logger.error(msg)
                 raise JeedomError(msg)
             result = data.get("result")
-            logger.debug("Jeedom API result type=%s len=%s", type(result).__name__, len(result) if isinstance(result, list) else "n/a")
+            count = len(result) if isinstance(result, list) else None
+            elapsed = (time.monotonic() - start_time) * 1000
+            logger.info(f"{method} completed in {elapsed:.0f}ms" + (f" ({count} items)" if count is not None else ""))
             return result
         except requests.exceptions.JSONDecodeError as exc:
             body = resp.text[:500] if resp is not None else "<no response>"
@@ -64,6 +68,13 @@ class JeedomClient:
         result = self._call("eqLogic::all")
         return result if isinstance(result, list) else []
 
+    def get_all_objects(self) -> dict[str, str]:
+        """Return a mapping of object ID → name (rooms/zones in Jeedom)."""
+        result = self._call("jeeObject::all")
+        if not isinstance(result, list):
+            return {}
+        return {str(obj["id"]): obj.get("name", "") for obj in result if "id" in obj}
+
     def get_equipment(self, equipment_id: int) -> dict | None:
         """Return a single equipment by ID."""
         return self._call("eqLogic::byId", {"id": equipment_id})
@@ -71,6 +82,11 @@ class JeedomClient:
     def get_commands(self, equipment_id: int) -> list[dict]:
         """Return all commands for a given equipment."""
         result = self._call("cmd::byEqLogicId", {"eqLogic_id": equipment_id})
+        return result if isinstance(result, list) else []
+
+    def get_all_commands(self) -> list[dict]:
+        """Return all commands from all equipment in a single API call."""
+        result = self._call("cmd::all")
         return result if isinstance(result, list) else []
 
     def exec_command(self, command_id: int, value: str | None = None) -> Any:
