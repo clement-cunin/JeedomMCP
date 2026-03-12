@@ -94,6 +94,7 @@ class JeedomMCP extends eqLogic {
         $cmd .= ' --pid ' . jeedom::getTmpFolder(__CLASS__) . '/deamon.pid';
         $cmd .= ' --port ' . config::byKey('port', __CLASS__, 8765);
         $cmd .= ' --apikey ' . config::byKey('mcpApiKey', __CLASS__);
+        $cmd .= ' --transport ' . config::byKey('transport', __CLASS__, 'http');
         $cmd .= ' --base_url ' . network::getNetworkAccess('external', 'proto:ip:port:comp') . '/mcp';
         $cmd .= ' --jeedom_url ' . network::getNetworkAccess('internal', 'proto:127.0.0.1:port:comp') . '/core/api/jeeApi.php';
         $cmd .= ' --jeedom_apikey ' . jeedom::getApiKey();

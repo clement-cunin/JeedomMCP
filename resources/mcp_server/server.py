@@ -198,6 +198,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--jeedom_url", type=str, required=True, help="Jeedom internal API URL")
     parser.add_argument("--jeedom_apikey", type=str, required=True, help="Jeedom API key")
     parser.add_argument("--loglevel", type=str, default="error")
+    parser.add_argument("--transport", type=str, default="http", choices=["http", "sse"])
     return parser.parse_args()
 
 
@@ -231,7 +232,9 @@ def main() -> None:
     log.info("- apikey     : %s...%s", args.apikey[:4], args.apikey[-4:])
     log.info("- jeedom_key : %s...%s", args.jeedom_apikey[:4], args.jeedom_apikey[-4:])
     log.info("- loglevel   : %s", args.loglevel)
+    log.info("- transport  : %s", args.transport)
     log.info("==========================")
+
 
     jeedom = JeedomClient(url=args.jeedom_url, apikey=args.jeedom_apikey)
 
@@ -247,7 +250,7 @@ def main() -> None:
     mcp = build_mcp(jeedom, base_url=args.base_url)
 
     mcp.run(
-        transport="http",
+        transport=args.transport,
         host="127.0.0.1",
         port=args.port,
         middleware=[Middleware(APIKeyMiddleware, api_key=args.apikey)],

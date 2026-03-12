@@ -10,6 +10,17 @@ if (!isConnect('admin')) {
         <legend><i class="fas fa-network-wired"></i> {{MCP Server}}</legend>
 
         <div class="form-group">
+            <label class="col-sm-4 control-label">{{Transport mode}}</label>
+            <div class="col-sm-2">
+                <select class="configKey form-control" data-l1key="transport">
+                    <option value="http">{{Streamable HTTP (recommended)}}</option>
+                    <option value="sse">{{SSE (legacy)}}</option>
+                </select>
+            </div>
+            <span class="help-block col-sm-6">{{HTTP: each tool call is an independent request, more resilient to restarts. SSE: persistent connection, requires client reconnection after daemon restart.}}</span>
+        </div>
+
+        <div class="form-group">
             <label class="col-sm-4 control-label">{{MCP server port}}</label>
             <div class="col-sm-2">
                 <input type="number" class="configKey form-control" data-l1key="port" placeholder="8765" min="1024" max="65535" />
