@@ -66,6 +66,28 @@ class JeedomClient:
     # Equipment
     # ------------------------------------------------------------------
 
+    def set_equipment_comment(self, equipment_id: int, comment: str) -> None:
+        """Set the comment field of an equipment via the plugin ajax endpoint."""
+        start_time = time.monotonic()
+        try:
+            resp = self.session.post(
+                self.ajax_url,
+                data={"action": "setDeviceComment", "equipment_id": equipment_id, "comment": comment, "apikey": self.apikey},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            elapsed = (time.monotonic() - start_time) * 1000
+            if data.get("state") != "ok":
+                msg = f"setDeviceComment error: {data.get('result', 'unknown error')}"
+                logger.error(msg)
+                raise JeedomError(msg)
+            logger.info(f"setDeviceComment completed in {elapsed:.0f}ms")
+        except requests.RequestException as exc:
+            msg = f"Jeedom API unreachable: {exc}"
+            logger.error(msg)
+            raise JeedomError(msg) from exc
+
     def get_all_equipment(self) -> list[dict]:
         """Return all equipment (eqLogic) from Jeedom."""
         result = self._call("eqLogic::all")

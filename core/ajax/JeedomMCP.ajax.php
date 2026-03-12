@@ -16,6 +16,16 @@ try {
         ajax::success(JeedomMCP::generateApiKey());
     }
 
+    if (init('action') == 'setDeviceComment') {
+        $eqLogic = eqLogic::byId(init('equipment_id'));
+        if (!is_object($eqLogic)) {
+            throw new Exception('Equipment not found: ' . init('equipment_id'));
+        }
+        $eqLogic->setComment(init('comment'));
+        $eqLogic->save();
+        ajax::success();
+    }
+
     if (init('action') == 'deleteScenario') {
         $scenario = scenario::byId(init('scenario_id'));
         if (!is_object($scenario)) {

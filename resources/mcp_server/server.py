@@ -157,6 +157,20 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
         }
 
     @mcp.tool()
+    def set_device_description(equipment_id: int, description: str) -> dict:
+        """Set the description (comment) of a Jeedom equipment.
+
+        Args:
+            equipment_id: Equipment ID obtained from list_devices.
+            description: Description text explaining the equipment's purpose or location.
+        """
+        try:
+            jeedom.set_equipment_comment(equipment_id, description)
+            return {"success": True, "equipment_id": equipment_id, "description": description}
+        except JeedomError as exc:
+            return {"error": str(exc)}
+
+    @mcp.tool()
     def get_all_states(equipment_ids: list[int] | None = None) -> list[dict]:
         """Get the current state of all equipment and their commands in a single call.
 

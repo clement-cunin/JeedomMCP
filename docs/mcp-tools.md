@@ -52,6 +52,25 @@ Gets the current state of a specific equipment and all its info commands.
 
 ---
 
+## `set_device_description`
+
+Sets the description (comment field) of a Jeedom equipment.
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `equipment_id` | int | yes | Equipment ID (from `list_devices`) |
+| `description` | string | yes | Description text explaining the equipment's purpose or location |
+
+**Returns**:
+
+```json
+{ "success": true, "equipment_id": 42, "description": "Main living room ceiling light" }
+```
+
+---
+
 ## `get_all_states`
 
 Gets the current state of all equipment and their commands in a single call (3 API requests total).
