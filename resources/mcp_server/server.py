@@ -100,12 +100,13 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
     def list_devices() -> list[dict]:
         """List all enabled Jeedom equipment."""
         equipment = jeedom.get_all_equipment()
+        objects = jeedom.get_all_objects()
         return [
             {
                 "id": int(eq["id"]),
                 "name": eq.get("name", ""),
                 "object_id": eq.get("object_id"),
-                "object_name": (eq.get("object") or {}).get("name"),
+                "object_name": objects.get(str(eq.get("object_id", ""))) or None,
                 "category": eq.get("category", ""),
                 "is_visible": eq.get("isVisible") == "1",
             }
@@ -140,6 +141,50 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
                 for cmd in commands
             ],
         }
+
+    @mcp.tool()
+    def get_all_states(equipment_ids: list[int] | None = None) -> list[dict]:
+        """Get the current state of all equipment and their commands in a single call.
+
+        Args:
+            equipment_ids: Optional list of equipment IDs to filter. If omitted, returns all enabled equipment.
+        """
+        equipment_list = jeedom.get_all_equipment()
+        all_commands = jeedom.get_all_commands()
+        objects = jeedom.get_all_objects()
+
+        # Group commands by equipment ID
+        commands_by_eq: dict[str, list] = {}
+        for cmd in all_commands:
+            eq_id = str(cmd.get("eqLogic_id", ""))
+            commands_by_eq.setdefault(eq_id, []).append(cmd)
+
+        result = []
+        for eq in equipment_list:
+            if eq.get("isEnable") != "1":
+                continue
+            if equipment_ids is not None and int(eq["id"]) not in equipment_ids:
+                continue
+            cmds = commands_by_eq.get(str(eq["id"]), [])
+            result.append({
+                "id": int(eq["id"]),
+                "name": eq.get("name", ""),
+                "object_name": objects.get(str(eq.get("object_id", ""))) or None,
+                "category": eq.get("category", ""),
+                "is_visible": eq.get("isVisible") == "1",
+                "commands": [
+                    {
+                        "id": int(cmd["id"]),
+                        "name": cmd.get("name", ""),
+                        "logicalId": cmd.get("logicalId", ""),
+                        "type": cmd.get("type", ""),
+                        "subType": cmd.get("subType", ""),
+                        "value": cmd.get("currentValue"),
+                    }
+                    for cmd in cmds
+                ],
+            })
+        return result
 
     @mcp.tool()
     def execute_command(command_id: int, value: str | None = None) -> dict:
