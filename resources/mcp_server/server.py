@@ -63,10 +63,10 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
         name="JeedomMCP",
         instructions=(
             "Control a Jeedom home automation system. "
-            "Use list_devices to discover available equipment, "
-            "get_device_state to read current values, "
-            "execute_command to trigger actions, "
-            "and list_scenarios / run_scenario for automation scenarios."
+            "Use devices_list to discover available equipment, "
+            "device_state to read current values, "
+            "command_execute to trigger actions, "
+            "and scenarios_list / scenario_run for automation scenarios."
         ),
     )
 
@@ -111,7 +111,7 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
         }
 
     @mcp.tool()
-    def list_devices() -> list[dict]:
+    def devices_list() -> list[dict]:
         """List all enabled Jeedom equipment."""
         equipment = jeedom.get_all_equipment()
         objects = jeedom.get_all_objects()
@@ -129,11 +129,11 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
         ]
 
     @mcp.tool()
-    def get_device_state(equipment_id: int) -> dict:
+    def device_state(equipment_id: int) -> dict:
         """Get the current state of an equipment and all its commands.
 
         Args:
-            equipment_id: Equipment ID obtained from list_devices.
+            equipment_id: Equipment ID obtained from devices_list.
         """
         eq = jeedom.get_equipment(equipment_id)
         if not eq:
@@ -157,11 +157,11 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
         }
 
     @mcp.tool()
-    def set_device_description(equipment_id: int, description: str) -> dict:
+    def device_set_description(equipment_id: int, description: str) -> dict:
         """Set the description (comment) of a Jeedom equipment.
 
         Args:
-            equipment_id: Equipment ID obtained from list_devices.
+            equipment_id: Equipment ID obtained from devices_list.
             description: Description text explaining the equipment's purpose or location.
         """
         try:
@@ -171,7 +171,7 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
             return {"error": str(exc)}
 
     @mcp.tool()
-    def get_all_states(equipment_ids: list[int] | None = None) -> list[dict]:
+    def devices_states(equipment_ids: list[int] | None = None) -> list[dict]:
         """Get the current state of all equipment and their commands in a single call.
 
         Args:
@@ -215,11 +215,11 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
         return result
 
     @mcp.tool()
-    def execute_command(command_id: int, value: str | None = None) -> dict:
+    def command_execute(command_id: int, value: str | None = None) -> dict:
         """Execute an action command on a Jeedom equipment.
 
         Args:
-            command_id: Command ID obtained from get_device_state.
+            command_id: Command ID obtained from device_state.
             value: Optional value for slider or text commands.
         """
         try:
@@ -229,7 +229,7 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
             return {"error": str(exc)}
 
     @mcp.tool()
-    def list_scenarios() -> list[dict]:
+    def scenarios_list() -> list[dict]:
         """List all Jeedom scenarios."""
         return [
             {
@@ -248,11 +248,11 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
         ]
 
     @mcp.tool()
-    def delete_scenario(scenario_id: int) -> dict:
+    def scenario_delete(scenario_id: int) -> dict:
         """Delete a Jeedom scenario permanently.
 
         Args:
-            scenario_id: Scenario ID obtained from list_scenarios.
+            scenario_id: Scenario ID obtained from scenarios_list.
         """
         try:
             jeedom.delete_scenario(scenario_id)
@@ -261,11 +261,11 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
             return {"error": str(exc)}
 
     @mcp.tool()
-    def get_scenario_actions(scenario_id: int) -> dict:
+    def scenario_get_actions(scenario_id: int) -> dict:
         """Get the full action blocks of a Jeedom scenario (elements, sub-elements, expressions).
 
         Args:
-            scenario_id: Scenario ID obtained from list_scenarios.
+            scenario_id: Scenario ID obtained from scenarios_list.
         """
         result = jeedom.get_scenario_actions(scenario_id)
         if result is None:
@@ -273,15 +273,15 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
         return {"scenario_id": scenario_id, "elements": result.get("elements", [])}
 
     @mcp.tool()
-    def set_scenario_actions(scenario_id: int, elements: list[dict]) -> dict:
+    def scenario_set_actions(scenario_id: int, elements: list[dict]) -> dict:
         """Replace the action blocks of a Jeedom scenario.
 
-        The elements structure mirrors the output of get_scenario_actions.
+        The elements structure mirrors the output of scenario_get_actions.
         Each element has a type, order, and subElements list; each subElement
         has expressions with the actual action commands or conditions.
 
         Args:
-            scenario_id: Scenario ID obtained from list_scenarios.
+            scenario_id: Scenario ID obtained from scenarios_list.
             elements: Full list of action blocks to save (replaces existing blocks).
         """
         try:
@@ -291,11 +291,11 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
             return {"error": str(exc)}
 
     @mcp.tool()
-    def set_scenario_description(scenario_id: int, description: str) -> dict:
+    def scenario_set_description(scenario_id: int, description: str) -> dict:
         """Set the description of a Jeedom scenario.
 
         Args:
-            scenario_id: Scenario ID obtained from list_scenarios.
+            scenario_id: Scenario ID obtained from scenarios_list.
             description: Description text explaining the scenario's purpose.
         """
         try:
@@ -306,7 +306,7 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
             return {"error": str(exc)}
 
     @mcp.tool()
-    def update_scenario(
+    def scenario_update(
         scenario_id: int,
         name: str | None = None,
         mode: str | None = None,
@@ -318,7 +318,7 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
         """Update fields of an existing Jeedom scenario. Only provided fields are modified.
 
         Args:
-            scenario_id: Scenario ID obtained from list_scenarios.
+            scenario_id: Scenario ID obtained from scenarios_list.
             name: New display name.
             mode: Execution mode — 'schedule', 'provoke', or 'always'.
             schedule: Cron expression (for schedule mode).
@@ -333,7 +333,7 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
             return {"error": str(exc)}
 
     @mcp.tool()
-    def create_scenario(
+    def scenario_create(
         name: str,
         mode: str,
         schedule: str | None = None,
@@ -360,11 +360,11 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
             return {"error": str(exc)}
 
     @mcp.tool()
-    def run_scenario(scenario_id: int) -> dict:
+    def scenario_run(scenario_id: int) -> dict:
         """Trigger a Jeedom scenario.
 
         Args:
-            scenario_id: Scenario ID obtained from list_scenarios.
+            scenario_id: Scenario ID obtained from scenarios_list.
         """
         try:
             jeedom.run_scenario(scenario_id)

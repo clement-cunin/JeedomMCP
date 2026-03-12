@@ -4,7 +4,7 @@ List of tools exposed by the JeedomMCP server.
 
 ---
 
-## `list_devices`
+## `devices_list`
 
 Lists all enabled Jeedom equipment.
 
@@ -27,7 +27,7 @@ Lists all enabled Jeedom equipment.
 
 ---
 
-## `get_device_state`
+## `device_state`
 
 Gets the current state of a specific equipment and all its info commands.
 
@@ -35,7 +35,7 @@ Gets the current state of a specific equipment and all its info commands.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `equipment_id` | int | yes | Equipment ID (from `list_devices`) |
+| `equipment_id` | int | yes | Equipment ID (from `devices_list`) |
 
 **Returns**:
 
@@ -52,7 +52,7 @@ Gets the current state of a specific equipment and all its info commands.
 
 ---
 
-## `set_device_description`
+## `device_set_description`
 
 Sets the description (comment field) of a Jeedom equipment.
 
@@ -60,7 +60,7 @@ Sets the description (comment field) of a Jeedom equipment.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `equipment_id` | int | yes | Equipment ID (from `list_devices`) |
+| `equipment_id` | int | yes | Equipment ID (from `devices_list`) |
 | `description` | string | yes | Description text explaining the equipment's purpose or location |
 
 **Returns**:
@@ -71,7 +71,7 @@ Sets the description (comment field) of a Jeedom equipment.
 
 ---
 
-## `get_all_states`
+## `devices_states`
 
 Gets the current state of all equipment and their commands in a single call (3 API requests total).
 
@@ -101,7 +101,7 @@ Gets the current state of all equipment and their commands in a single call (3 A
 
 ---
 
-## `execute_command`
+## `command_execute`
 
 Executes an action command on a Jeedom equipment.
 
@@ -109,7 +109,7 @@ Executes an action command on a Jeedom equipment.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `command_id` | int | yes | Command ID (from `get_device_state`) |
+| `command_id` | int | yes | Command ID (from `device_state`) |
 | `value` | string | no | Value for slider/text commands |
 
 **Returns**:
@@ -126,7 +126,7 @@ Executes an action command on a Jeedom equipment.
 
 ---
 
-## `list_scenarios`
+## `scenarios_list`
 
 Lists all Jeedom scenarios.
 
@@ -160,7 +160,7 @@ Lists all Jeedom scenarios.
 
 ---
 
-## `get_scenario_actions`
+## `scenario_get_actions`
 
 Gets the full action blocks of a Jeedom scenario (elements, sub-elements, expressions).
 
@@ -168,7 +168,7 @@ Gets the full action blocks of a Jeedom scenario (elements, sub-elements, expres
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `scenario_id` | int | yes | Scenario ID (from `list_scenarios`) |
+| `scenario_id` | int | yes | Scenario ID (from `scenarios_list`) |
 
 **Returns**:
 
@@ -207,15 +207,15 @@ Gets the full action blocks of a Jeedom scenario (elements, sub-elements, expres
 
 ---
 
-## `set_scenario_actions`
+## `scenario_set_actions`
 
-Replaces the action blocks of a Jeedom scenario. The `elements` structure mirrors the output of `get_scenario_actions`.
+Replaces the action blocks of a Jeedom scenario. The `elements` structure mirrors the output of `scenario_get_actions`.
 
 **Parameters**:
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `scenario_id` | int | yes | Scenario ID (from `list_scenarios`) |
+| `scenario_id` | int | yes | Scenario ID (from `scenarios_list`) |
 | `elements` | object[] | yes | Full list of action blocks to save (replaces existing blocks) |
 
 **Returns**:
@@ -226,7 +226,7 @@ Replaces the action blocks of a Jeedom scenario. The `elements` structure mirror
 
 ---
 
-## `set_scenario_description`
+## `scenario_set_description`
 
 Sets the description of a Jeedom scenario.
 
@@ -234,7 +234,7 @@ Sets the description of a Jeedom scenario.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `scenario_id` | int | yes | Scenario ID (from `list_scenarios`) |
+| `scenario_id` | int | yes | Scenario ID (from `scenarios_list`) |
 | `description` | string | yes | Description text explaining the scenario's purpose |
 
 **Returns**:
@@ -245,7 +245,7 @@ Sets the description of a Jeedom scenario.
 
 ---
 
-## `update_scenario`
+## `scenario_update`
 
 Updates fields of an existing Jeedom scenario. Only provided fields are modified.
 
@@ -253,7 +253,7 @@ Updates fields of an existing Jeedom scenario. Only provided fields are modified
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `scenario_id` | int | yes | Scenario ID (from `list_scenarios`) |
+| `scenario_id` | int | yes | Scenario ID (from `scenarios_list`) |
 | `name` | string | no | New display name |
 | `mode` | string | no | `schedule`, `provoke`, or `always` |
 | `schedule` | string | no | Cron expression (for schedule mode) |
@@ -269,7 +269,7 @@ Updates fields of an existing Jeedom scenario. Only provided fields are modified
 
 ---
 
-## `create_scenario`
+## `scenario_create`
 
 Creates a new Jeedom scenario.
 
@@ -304,7 +304,7 @@ Creates a new Jeedom scenario.
 
 ---
 
-## `delete_scenario`
+## `scenario_delete`
 
 Permanently deletes a Jeedom scenario.
 
@@ -312,7 +312,7 @@ Permanently deletes a Jeedom scenario.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `scenario_id` | int | yes | Scenario ID (from `list_scenarios`) |
+| `scenario_id` | int | yes | Scenario ID (from `scenarios_list`) |
 
 **Returns**:
 
@@ -322,7 +322,7 @@ Permanently deletes a Jeedom scenario.
 
 ---
 
-## `run_scenario`
+## `scenario_run`
 
 Triggers a Jeedom scenario.
 
@@ -330,7 +330,7 @@ Triggers a Jeedom scenario.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `scenario_id` | int | yes | Scenario ID (from `list_scenarios`) |
+| `scenario_id` | int | yes | Scenario ID (from `scenarios_list`) |
 
 **Returns**:
 
