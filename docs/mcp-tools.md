@@ -141,6 +141,25 @@ Lists all Jeedom scenarios.
 
 ---
 
+## `set_scenario_description`
+
+Sets the description of a Jeedom scenario.
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `scenario_id` | int | yes | Scenario ID (from `list_scenarios`) |
+| `description` | string | yes | Description text explaining the scenario's purpose |
+
+**Returns**:
+
+```json
+{ "success": true, "scenario_id": 5, "description": "Turns off all lights and locks doors at bedtime" }
+```
+
+---
+
 ## `run_scenario`
 
 Triggers a Jeedom scenario.
