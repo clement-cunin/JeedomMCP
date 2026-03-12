@@ -207,9 +207,14 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
             {
                 "id": int(s["id"]),
                 "name": s.get("name", ""),
-                "group": s.get("group", ""),
-                "state": s.get("state", ""),
+                "group": s.get("group", "") or None,
+                "description": s.get("description", "") or None,
                 "is_active": s.get("isActive") == "1",
+                "state": s.get("state", "") or None,
+                "mode": s.get("mode", ""),
+                "schedule": s.get("schedule") or None,
+                "trigger": [t for t in (s.get("trigger") or []) if t] or None,
+                "last_launch": s.get("lastLaunch", "") or None,
             }
             for s in jeedom.get_all_scenarios()
         ]

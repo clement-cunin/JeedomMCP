@@ -121,11 +121,23 @@ Lists all Jeedom scenarios.
     "id": 5,
     "name": "Evening mode",
     "group": "Ambiance",
+    "description": "Turns on lights and sets heating at sunset",
+    "is_active": true,
     "state": "stop",
-    "is_active": true
+    "mode": "schedule",
+    "schedule": "30 21 * * *",
+    "trigger": null,
+    "last_launch": "2026-03-11 21:30:03"
   }
 ]
 ```
+
+| Field | Description |
+|-------|-------------|
+| `mode` | `schedule` (cron-based), `provoke` (trigger-based), or `always` |
+| `schedule` | Cron expression(s) — string or array when multiple schedules are defined |
+| `trigger` | List of trigger conditions, or `null` if none |
+| `last_launch` | Datetime of last execution, or `null` if never run |
 
 ---
 
