@@ -247,7 +247,7 @@ def main() -> None:
     mcp = build_mcp(jeedom, base_url=args.base_url)
 
     mcp.run(
-        transport="sse",
+        transport="http",
         host="127.0.0.1",
         port=args.port,
         middleware=[Middleware(APIKeyMiddleware, api_key=args.apikey)],
