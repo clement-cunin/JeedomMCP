@@ -93,12 +93,117 @@ class JeedomClient:
         result = self._call("eqLogic::all")
         return result if isinstance(result, list) else []
 
-    def get_all_objects(self) -> dict[str, str]:
-        """Return a mapping of object ID → name (rooms/zones in Jeedom)."""
+    def get_all_objects(self) -> list[dict]:
+        """Return all rooms/zones (jeeObjects) from Jeedom."""
         result = self._call("jeeObject::all")
         if not isinstance(result, list):
-            return {}
-        return {str(obj["id"]): obj.get("name", "") for obj in result if "id" in obj}
+            return []
+        for obj in result:
+            cfg = obj.get("configuration") or {}
+            if isinstance(cfg, str):
+                import json
+                try:
+                    cfg = json.loads(cfg)
+                except Exception:
+                    cfg = {}
+            obj["_description"] = cfg.get("description", "") or None
+            obj["_surface"] = cfg.get("info::space", "") or None
+            obj["_orientation"] = cfg.get("info::orientation", "") or None
+        return result
+
+    def get_object_name_map(self) -> dict[str, str]:
+        """Return a mapping of object ID → name."""
+        return {str(obj["id"]): obj.get("name", "") for obj in self.get_all_objects() if "id" in obj}
+
+    def create_room(self, name: str, description: str | None = None, surface: str | None = None, orientation: str | None = None, parent_id: int | None = None) -> dict:
+        """Create a new room via the plugin ajax endpoint."""
+        data: dict = {"action": "createRoom", "name": name, "apikey": self.apikey}
+        if description is not None:
+            data["description"] = description
+        if surface is not None:
+            data["surface"] = surface
+        if orientation is not None:
+            data["orientation"] = orientation
+        if parent_id is not None:
+            data["parent_id"] = parent_id
+        start_time = time.monotonic()
+        try:
+            resp = self.session.post(self.ajax_url, data=data, timeout=10)
+            resp.raise_for_status()
+            result = resp.json()
+            elapsed = (time.monotonic() - start_time) * 1000
+            if result.get("state") != "ok":
+                raise JeedomError(f"createRoom error: {result.get('result', 'unknown error')}")
+            logger.info(f"createRoom completed in {elapsed:.0f}ms")
+            return result.get("result", {})
+        except requests.RequestException as exc:
+            raise JeedomError(f"Jeedom API unreachable: {exc}") from exc
+
+    def update_room(self, room_id: int, name: str | None = None, description: str | None = None, surface: str | None = None, orientation: str | None = None, parent_id: int | str | None = None) -> dict:
+        """Update a room's fields via the plugin ajax endpoint."""
+        data: dict = {"action": "updateRoom", "room_id": room_id, "apikey": self.apikey}
+        if name is not None:
+            data["name"] = name
+        if description is not None:
+            data["description"] = description
+        if surface is not None:
+            data["surface"] = surface
+        if orientation is not None:
+            data["orientation"] = orientation
+        if parent_id is not None:
+            data["parent_id"] = parent_id  # pass "null" string to unset parent
+        start_time = time.monotonic()
+        try:
+            resp = self.session.post(self.ajax_url, data=data, timeout=10)
+            resp.raise_for_status()
+            result = resp.json()
+            elapsed = (time.monotonic() - start_time) * 1000
+            if result.get("state") != "ok":
+                raise JeedomError(f"updateRoom error: {result.get('result', 'unknown error')}")
+            logger.info(f"updateRoom completed in {elapsed:.0f}ms")
+            return result.get("result", {})
+        except requests.RequestException as exc:
+            raise JeedomError(f"Jeedom API unreachable: {exc}") from exc
+
+    def delete_room(self, room_id: int) -> None:
+        """Delete a room via the plugin ajax endpoint."""
+        start_time = time.monotonic()
+        try:
+            resp = self.session.post(
+                self.ajax_url,
+                data={"action": "deleteRoom", "room_id": room_id, "apikey": self.apikey},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            result = resp.json()
+            elapsed = (time.monotonic() - start_time) * 1000
+            if result.get("state") != "ok":
+                raise JeedomError(f"deleteRoom error: {result.get('result', 'unknown error')}")
+            logger.info(f"deleteRoom completed in {elapsed:.0f}ms")
+        except requests.RequestException as exc:
+            raise JeedomError(f"Jeedom API unreachable: {exc}") from exc
+
+    def set_room_description(self, room_id: int, description: str) -> None:
+        """Set the description of a room via the plugin ajax endpoint."""
+        start_time = time.monotonic()
+        try:
+            resp = self.session.post(
+                self.ajax_url,
+                data={"action": "setRoomDescription", "room_id": room_id, "description": description, "apikey": self.apikey},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            elapsed = (time.monotonic() - start_time) * 1000
+            if data.get("state") != "ok":
+                msg = f"setRoomDescription error: {data.get('result', 'unknown error')}"
+                logger.error(msg)
+                raise JeedomError(msg)
+            logger.info(f"setRoomDescription completed in {elapsed:.0f}ms")
+        except requests.RequestException as exc:
+            msg = f"Jeedom API unreachable: {exc}"
+            logger.error(msg)
+            raise JeedomError(msg) from exc
 
     def get_equipment(self, equipment_id: int) -> dict | None:
         """Return a single equipment by ID."""

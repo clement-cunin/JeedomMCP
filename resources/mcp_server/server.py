@@ -114,7 +114,7 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
     def devices_list() -> list[dict]:
         """List all enabled Jeedom equipment."""
         equipment = jeedom.get_all_equipment()
-        objects = jeedom.get_all_objects()
+        objects = jeedom.get_object_name_map()
         return [
             {
                 "id": int(eq["id"]),
@@ -173,6 +173,86 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
             return {"error": str(exc)}
 
     @mcp.tool()
+    def rooms_list() -> list[dict]:
+        """List all rooms (objects) in the Jeedom home."""
+        rooms = jeedom.get_all_objects()
+        return [
+            {
+                "id": int(r["id"]),
+                "name": r.get("name", ""),
+                "description": r.get("_description"),
+                "surface": r.get("_surface"),
+                "orientation": r.get("_orientation"),
+                "parent_id": r.get("father_id") or None,
+            }
+            for r in rooms
+            if "id" in r
+        ]
+
+    @mcp.tool()
+    def room_create(name: str, description: str | None = None, surface: str | None = None, orientation: str | None = None, parent_id: int | None = None) -> dict:
+        """Create a new room in the Jeedom home.
+
+        Args:
+            name: Display name of the room.
+            description: Optional description of the room.
+            surface: Floor area in square metres (e.g. "15.5").
+            orientation: Orientation as degrees: 0=N, 45=NE, 90=E, 135=SE, 180=S, 225=SW, 270=W, 315=NW.
+            parent_id: Optional parent room ID for nested rooms (from rooms_list).
+        """
+        try:
+            result = jeedom.create_room(name, description, surface, orientation, parent_id)
+            return {"success": True, **result}
+        except JeedomError as exc:
+            return {"error": str(exc)}
+
+    @mcp.tool()
+    def room_update(room_id: int, name: str | None = None, description: str | None = None, surface: str | None = None, orientation: str | None = None, parent_id: int | None = None) -> dict:
+        """Update a Jeedom room. Only provided fields are modified.
+
+        Args:
+            room_id: Room ID obtained from rooms_list.
+            name: New display name.
+            description: New description text.
+            surface: Floor area in square metres (e.g. "15.5").
+            orientation: Orientation as degrees: 0=N, 45=NE, 90=E, 135=SE, 180=S, 225=SW, 270=W, 315=NW.
+            parent_id: New parent room ID. Pass 0 to move the room to the top level.
+        """
+        try:
+            parent = "null" if parent_id == 0 else parent_id
+            result = jeedom.update_room(room_id, name, description, surface, orientation, parent)
+            return {"success": True, **result}
+        except JeedomError as exc:
+            return {"error": str(exc)}
+
+    @mcp.tool()
+    def room_delete(room_id: int) -> dict:
+        """Permanently delete a Jeedom room.
+
+        Args:
+            room_id: Room ID obtained from rooms_list.
+        """
+        try:
+            jeedom.delete_room(room_id)
+            return {"success": True, "room_id": room_id}
+        except JeedomError as exc:
+            return {"error": str(exc)}
+
+    @mcp.tool()
+    def room_set_description(room_id: int, description: str) -> dict:
+        """Set the description of a Jeedom room.
+
+        Args:
+            room_id: Room ID obtained from rooms_list.
+            description: Description text explaining the room.
+        """
+        try:
+            jeedom.set_room_description(room_id, description)
+            return {"success": True, "room_id": room_id, "description": description}
+        except JeedomError as exc:
+            return {"error": str(exc)}
+
+    @mcp.tool()
     def devices_states(equipment_ids: list[int] | None = None) -> list[dict]:
         """Get the current state of all equipment and their commands in a single call.
 
@@ -181,7 +261,7 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
         """
         equipment_list = jeedom.get_all_equipment()
         all_commands = jeedom.get_all_commands()
-        objects = jeedom.get_all_objects()
+        objects = jeedom.get_object_name_map()
 
         # Group commands by equipment ID
         commands_by_eq: dict[str, list] = {}

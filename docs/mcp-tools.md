@@ -17,6 +17,7 @@ Lists all enabled Jeedom equipment.
   {
     "id": 42,
     "name": "Living room light",
+    "description": "Ceiling light, Z-Wave dimmer",
     "object_id": "12",
     "object_name": "Living room",
     "category": "light",
@@ -122,6 +123,118 @@ Executes an action command on a Jeedom equipment.
 
 ```json
 { "error": "Command 103 not found" }
+```
+
+---
+
+## `rooms_list`
+
+Lists all rooms (Jeedom objects) in the home.
+
+**Parameters**: none
+
+**Returns**:
+
+```json
+[
+  {
+    "id": 2,
+    "name": "Salon",
+    "description": "Pièce principale avec accès cuisine",
+    "surface": "30",
+    "orientation": "180",
+    "parent_id": null
+  }
+]
+```
+
+| Field | Description |
+|-------|-------------|
+| `description` | Free-text description, or `null` |
+| `surface` | Floor area in square metres, or `null` |
+| `orientation` | Orientation as degrees — one of 8 values: `0`=N, `45`=NE, `90`=E, `135`=SE, `180`=S, `225`=SW, `270`=W, `315`=NW, or `null` |
+| `parent_id` | ID of the parent room, or `null` for top-level rooms |
+
+---
+
+## `room_create`
+
+Creates a new room in the Jeedom home.
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | yes | Display name of the room |
+| `description` | string | no | Description text explaining the room |
+| `surface` | string | no | Floor area in square metres (e.g. `"15.5"`) |
+| `orientation` | string | no | Orientation in degrees — one of: `0`, `45`, `90`, `135`, `180`, `225`, `270`, `315` |
+| `parent_id` | int | no | Parent room ID for nested rooms (from `rooms_list`) |
+
+**Returns**:
+
+```json
+{ "success": true, "id": 12, "name": "Bureau", "description": null, "surface": "12", "orientation": "0", "parent_id": 1 }
+```
+
+---
+
+## `room_update`
+
+Updates a Jeedom room. Only provided fields are modified.
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `room_id` | int | yes | Room ID (from `rooms_list`) |
+| `name` | string | no | New display name |
+| `description` | string | no | New description text |
+| `surface` | string | no | Floor area in square metres |
+| `orientation` | string | no | Orientation in degrees — one of: `0`, `45`, `90`, `135`, `180`, `225`, `270`, `315` |
+| `parent_id` | int | no | New parent room ID. Pass `0` to move to top level |
+
+**Returns**:
+
+```json
+{ "success": true, "id": 2, "name": "Salon", "description": "Pièce principale", "surface": "30", "orientation": "180", "parent_id": null }
+```
+
+---
+
+## `room_delete`
+
+Permanently deletes a Jeedom room.
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `room_id` | int | yes | Room ID (from `rooms_list`) |
+
+**Returns**:
+
+```json
+{ "success": true, "room_id": 12 }
+```
+
+---
+
+## `room_set_description`
+
+Sets the description of a Jeedom room.
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `room_id` | int | yes | Room ID (from `rooms_list`) |
+| `description` | string | yes | Description text explaining the room |
+
+**Returns**:
+
+```json
+{ "success": true, "room_id": 2, "description": "Pièce principale avec accès cuisine" }
 ```
 
 ---
