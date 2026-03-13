@@ -113,10 +113,18 @@ Executes an action command on a Jeedom equipment.
 | `command_id` | int | yes | Command ID (from `device_state`) |
 | `value` | string | no | Value for slider/text commands |
 
-**Returns**:
+**Returns**: updated equipment state after execution
 
 ```json
-{ "success": true, "command_id": 103 }
+{
+  "success": true,
+  "command_id": 103,
+  "equipment_id": 42,
+  "commands": [
+    { "id": 101, "name": "State", "logicalId": "state", "type": "info", "subType": "binary", "value": "1" },
+    { "id": 103, "name": "On", "logicalId": "on", "type": "action", "subType": "other", "value": null }
+  ]
+}
 ```
 
 **Error**:

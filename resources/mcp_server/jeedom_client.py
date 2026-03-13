@@ -209,6 +209,10 @@ class JeedomClient:
         """Return a single equipment by ID."""
         return self._call("eqLogic::byId", {"id": equipment_id})
 
+    def get_command(self, command_id: int) -> dict | None:
+        """Return a single command by ID."""
+        return self._call("cmd::byId", {"id": command_id})
+
     def get_commands(self, equipment_id: int) -> list[dict]:
         """Return all commands for a given equipment."""
         result = self._call("cmd::byEqLogicId", {"eqLogic_id": equipment_id})

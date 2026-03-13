@@ -299,7 +299,7 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
 
     @mcp.tool()
     def command_execute(command_id: int, value: str | None = None) -> dict:
-        """Execute an action command on a Jeedom equipment.
+        """Execute an action command on a Jeedom equipment and return the updated equipment state.
 
         Args:
             command_id: Command ID obtained from device_state.
@@ -307,7 +307,27 @@ def build_mcp(jeedom: JeedomClient, base_url: str) -> FastMCP:
         """
         try:
             jeedom.exec_command(command_id, value)
-            return {"success": True, "command_id": command_id}
+            cmd = jeedom.get_command(command_id)
+            if not cmd:
+                return {"success": True, "command_id": command_id}
+            equipment_id = int(cmd.get("eqLogic_id", 0))
+            commands = jeedom.get_commands(equipment_id)
+            return {
+                "success": True,
+                "command_id": command_id,
+                "equipment_id": equipment_id,
+                "commands": [
+                    {
+                        "id": int(c["id"]),
+                        "name": c.get("name", ""),
+                        "logicalId": c.get("logicalId", ""),
+                        "type": c.get("type", ""),
+                        "subType": c.get("subType", ""),
+                        "value": c.get("currentValue"),
+                    }
+                    for c in commands
+                ],
+            }
         except JeedomError as exc:
             return {"error": str(exc)}
 
