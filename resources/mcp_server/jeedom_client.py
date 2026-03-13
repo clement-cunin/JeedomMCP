@@ -167,9 +167,17 @@ class JeedomClient:
         """Trigger a scenario."""
         return self._call("scenario::changeState", {"id": scenario_id, "state": "run"})
 
+    def _get_scenario_name(self, scenario_id: int) -> str:
+        """Fetch the current name of a scenario (required by scenario::save for partial updates)."""
+        existing = self._call("scenario::byId", {"id": scenario_id})
+        if isinstance(existing, dict):
+            return existing.get("name", "")
+        return ""
+
     def set_scenario_description(self, scenario_id: int, description: str) -> Any:
         """Update the description field of a scenario."""
-        return self._call("scenario::save", {"id": scenario_id, "description": description})
+        name = self._get_scenario_name(scenario_id)
+        return self._call("scenario::save", {"id": scenario_id, "name": name, "description": description})
 
     def update_scenario(
         self,
@@ -183,8 +191,10 @@ class JeedomClient:
     ) -> Any:
         """Update fields of an existing scenario."""
         params: dict = {"id": scenario_id}
-        if name is not None:
-            params["name"] = name
+        # scenario::save always requires name — fetch existing if not provided
+        if name is None:
+            name = self._get_scenario_name(scenario_id)
+        params["name"] = name
         if mode is not None:
             params["mode"] = mode
         if schedule is not None:
