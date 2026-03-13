@@ -44,9 +44,10 @@ Gets the current state of a specific equipment and all its info commands.
 {
   "equipment_id": 42,
   "name": "Living room light",
+  "description": "Ceiling light, Z-Wave dimmer",
   "commands": [
-    { "id": 101, "name": "State", "logicalId": "state", "value": "1" },
-    { "id": 102, "name": "Brightness", "logicalId": "brightness", "value": "75" }
+    { "id": 101, "name": "State", "logicalId": "state", "type": "info", "subType": "binary", "value": "1" },
+    { "id": 102, "name": "Brightness", "logicalId": "brightness", "type": "info", "subType": "numeric", "value": "75" }
   ]
 }
 ```
@@ -89,6 +90,7 @@ Gets the current state of all equipment and their commands in a single call (3 A
   {
     "id": 42,
     "name": "Living room light",
+    "description": "Ceiling light, Z-Wave dimmer",
     "object_name": "Living room",
     "category": "light",
     "is_visible": true,
@@ -150,7 +152,7 @@ Lists all rooms (Jeedom objects) in the home.
     "name": "Salon",
     "description": "Pièce principale avec accès cuisine",
     "surface": "30",
-    "orientation": "180",
+    "orientation": 180,
     "parent_id": null
   }
 ]
@@ -182,7 +184,7 @@ Creates a new room in the Jeedom home.
 **Returns**:
 
 ```json
-{ "success": true, "id": 12, "name": "Bureau", "description": null, "surface": "12", "orientation": "0", "parent_id": 1 }
+{ "id": 12, "name": "Bureau", "description": null, "surface": "12", "orientation": 0, "parent_id": 1 }
 ```
 
 ---
@@ -205,7 +207,7 @@ Updates a Jeedom room. Only provided fields are modified.
 **Returns**:
 
 ```json
-{ "success": true, "id": 2, "name": "Salon", "description": "Pièce principale", "surface": "30", "orientation": "180", "parent_id": null }
+{ "id": 2, "name": "Salon", "description": "Pièce principale", "surface": "30", "orientation": 180, "parent_id": null }
 ```
 
 ---
