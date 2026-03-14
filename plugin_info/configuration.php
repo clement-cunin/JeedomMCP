@@ -2,32 +2,13 @@
 if (!isConnect('admin')) {
     throw new Exception('{{401 - Unauthorized access}}');
 }
-$mcpBaseUrl = network::getNetworkAccess('external', 'proto:ip:port:comp') . '/mcp';
+$mcpUrl = network::getNetworkAccess('external', 'proto:ip:port:comp') . '/plugins/JeedomMCP/api/mcp.php';
 ?>
 
 <form class="form-horizontal">
     <fieldset>
 
-        <legend><i class="fas fa-network-wired"></i> {{MCP Server}}</legend>
-
-        <div class="form-group">
-            <label class="col-sm-4 control-label">{{Transport mode}}</label>
-            <div class="col-sm-2">
-                <select class="configKey form-control" data-l1key="transport" id="sel_transport">
-                    <option value="http">{{Streamable HTTP (recommended)}}</option>
-                    <option value="sse">{{SSE (legacy)}}</option>
-                </select>
-            </div>
-            <span class="help-block col-sm-6">{{HTTP: each tool call is an independent request, more resilient to restarts. SSE: persistent connection, requires client reconnection after daemon restart.}}</span>
-        </div>
-
-        <div class="form-group">
-            <label class="col-sm-4 control-label">{{MCP server port}}</label>
-            <div class="col-sm-2">
-                <input type="number" class="configKey form-control" data-l1key="port" placeholder="8765" min="1024" max="65535" />
-            </div>
-            <span class="help-block col-sm-6">{{TCP port the Python daemon listens on (default: 8765). Must match the Apache2 proxy config.}}</span>
-        </div>
+        <legend><i class="fas fa-key"></i> {{MCP API key}}</legend>
 
         <div class="form-group">
             <label class="col-sm-4 control-label">{{MCP API key}}</label>
@@ -65,17 +46,15 @@ $mcpBaseUrl = network::getNetworkAccess('external', 'proto:ip:port:comp') . '/mc
 </form>
 
 <script>
-var mcpBaseUrl = '<?php echo $mcpBaseUrl; ?>';
+var mcpUrl = '<?php echo $mcpUrl; ?>';
 
 function buildMcpJson() {
-    var transport = $('#sel_transport').val() || 'http';
     var apikey = $('#inp_mcpApiKey').val() || '';
-    var url = transport === 'sse' ? mcpBaseUrl + '/sse' : mcpBaseUrl + '/mcp';
     var config = {
         mcpServers: {
             jeedom: {
-                type: transport,
-                url: url,
+                type: 'http',
+                url: mcpUrl,
                 headers: { 'X-API-Key': apikey }
             }
         }
@@ -87,8 +66,6 @@ function updateMcpJsonPreview() {
     $('#mcp_json_preview').text(buildMcpJson());
 }
 
-// Update preview on transport change or apikey update
-$('#sel_transport').on('change', updateMcpJsonPreview);
 $('#inp_mcpApiKey').on('change', updateMcpJsonPreview);
 
 // Jeedom loads config values asynchronously after DOM ready — poll until populated

@@ -5,10 +5,11 @@
 | Element | Minimum version |
 |---------|----------------|
 | Jeedom | 4.4 |
-| Python | 3.9 |
+| PHP | 7.4 |
 | Apache2 | any recent version |
 
-> Apache2 is already installed on any standard Jeedom installation (Raspberry Pi, etc.).
+> Apache2 and PHP are already installed on any standard Jeedom installation (Raspberry Pi, etc.).
+> No Python, no daemon, no reverse proxy configuration required.
 
 ---
 
@@ -37,98 +38,20 @@ sudo chmod -R 755 /var/www/html/plugins/JeedomMCP
 2. Go to **Plugins → Plugin management**
 3. Find **JeedomMCP** in the list and click **Enable**
 
----
-
-## Step 3 — Install Python dependencies
-
-On the plugin configuration page (**Plugins → Home automation → JeedomMCP**):
-
-1. Check that the **Dependencies** status is shown in red/orange
-2. Click **Install dependencies**
-3. Wait for the installation to complete (visible in `JeedomMCP_update` logs)
-
-To verify manually on the server:
-
-```bash
-python3 -c "import fastmcp, requests; print('OK')"
-```
-
-If automatic installation fails, install manually:
-
-```bash
-pip3 install -r /var/www/html/plugins/JeedomMCP/resources/mcp_server/requirements.txt
-```
+An MCP API key is automatically generated on first activation.
 
 ---
 
-## Step 4 — Configure Apache2 reverse proxy
+## Step 3 — Retrieve your API key
 
-The Python daemon listens on `127.0.0.1:8765` (not directly exposed).
-Apache2 acts as a reverse proxy to expose it over HTTPS.
+Go to **Plugins → Home automation → JeedomMCP**:
 
-Enable the required modules:
-
-```bash
-sudo a2enmod proxy proxy_http headers
-sudo systemctl reload apache2
-```
-
-Add the following block **inside your HTTPS `VirtualHost`**, in the Jeedom Apache2 site config (usually `/etc/apache2/sites-enabled/000-default-le-ssl.conf`):
-
-```apache
-# JeedomMCP — MCP server reverse proxy
-# The /mcp/ prefix is stripped before forwarding to the Python server
-<Location /mcp/>
-    ProxyPass http://127.0.0.1:8765/ flushpackets=on
-    ProxyPassReverse http://127.0.0.1:8765/
-    RequestHeader set Connection ""
-    SetEnv proxy-initial-not-buffered 1
-</Location>
-```
-
-Reload Apache2:
-
-```bash
-sudo apache2ctl configtest
-sudo systemctl reload apache2
-```
+1. Copy the **MCP API key** (click the copy button)
+2. The `.mcp.json` snippet is pre-filled and ready to copy
 
 ---
 
-## Step 5 — Start the daemon
-
-On the plugin configuration page:
-
-1. Verify that dependencies are **OK** (green badge)
-2. Click **Start**
-3. The status should switch to **Running** (green badge)
-
-To check the logs:
-
-```
-Plugins → JeedomMCP → Logs (JeedomMCP tab)
-```
-
----
-
-## Step 6 — Verify the MCP endpoint
-
-Test that the server is reachable:
-
-```bash
-curl -s https://your-jeedom.duckdns.org/health
-# Should return: ok
-
-curl -s -H "X-API-Key: YOUR_KEY" \
-     https://your-jeedom.duckdns.org/mcp/sse
-# Should initiate an SSE connection
-```
-
----
-
-## Step 7 — Configure your MCP client
-
-### Per-project (`.mcp.json`)
+## Step 4 — Configure your MCP client
 
 Create a `.mcp.json` file at the root of your project:
 
@@ -136,8 +59,8 @@ Create a `.mcp.json` file at the root of your project:
 {
   "mcpServers": {
     "jeedom": {
-      "type": "sse",
-      "url": "https://your-jeedom.duckdns.org/mcp/sse",
+      "type": "http",
+      "url": "https://your-jeedom.duckdns.org/plugins/JeedomMCP/api/mcp.php",
       "headers": {
         "X-API-Key": "YOUR_MCP_API_KEY"
       }
@@ -146,32 +69,38 @@ Create a `.mcp.json` file at the root of your project:
 }
 ```
 
-The MCP API key is visible (and copyable) on the Jeedom plugin configuration page.
+The exact URL and key are shown on the plugin configuration page.
+
+---
+
+## Step 5 — Verify the connection
+
+Test that the endpoint is reachable:
+
+```bash
+curl -s https://your-jeedom.duckdns.org/plugins/JeedomMCP/api/mcp.php
+# Should return: {"status":"ok","server":"JeedomMCP-PHP"}
+```
+
+In Claude Code, run `/mcp` — the `jeedom` server should appear as **connected**.
 
 ---
 
 ## Troubleshooting
 
-### Daemon does not start
+### 401 Unauthorized
 
-Check the plugin logs:
+The `X-API-Key` header is missing or incorrect. Check the key on the plugin configuration page.
 
-```
-Plugins → JeedomMCP → Logs (JeedomMCP tab)
-```
+### 404 Not Found
 
-Test the daemon manually on the server:
+The plugin path is wrong or file permissions prevent Apache from serving the file.
+Check: `sudo chown -R www-data:www-data /var/www/html/plugins/JeedomMCP`
+
+### 500 Internal Server Error
+
+A PHP error occurred. Check the Apache error log:
 
 ```bash
-python3 /var/www/html/plugins/JeedomMCP/resources/mcp_server/server.py \
-  --loglevel debug \
-  --port 8765 \
-  --jeedom_apikey <JEEDOM_API_KEY> \
-  --apikey test123 \
-  --pid /tmp/test.pid
+sudo tail -50 /var/log/apache2/error.log
 ```
-
-### Apache2 returns 502
-
-The daemon is not running or is listening on a different port.
-Check the port in the plugin config and in the Apache2 site config.
