@@ -6,7 +6,6 @@
     "author": "clement-cunin",
     "require": "4.4",
     "category": "programming",
-    "hasDependency": true,
-    "hasOwnDeamon": true,
-    "maxDependencyInstallTime": 10
+    "hasDependency": false,
+    "hasOwnDeamon": false
 }
