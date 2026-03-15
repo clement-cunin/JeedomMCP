@@ -14,36 +14,25 @@ Returns the current ACL mode and all authorized operations. Call this first to k
 
 ```json
 {
-  "mode": "custom",
-  "permissions": {
-    "devices": {
-      "read": true,
-      "execution": true,
-      "set_description": false
-    },
-    "rooms": {
-      "read": true,
-      "set_description": false,
-      "create": false,
-      "update": false,
-      "delete": false
-    },
-    "scenarios": {
-      "read": true,
-      "execution": true,
-      "set_description": false,
-      "create": false,
-      "update": false,
-      "delete": false
-    }
-  }
+  "mode": "read_execute",
+  "authorized_tools": [
+    "acl_list",
+    "devices_list",
+    "device_state",
+    "devices_states",
+    "command_execute",
+    "rooms_list",
+    "scenarios_list",
+    "scenario_get_actions",
+    "scenario_run"
+  ]
 }
 ```
 
 | Field | Description |
 |-------|-------------|
 | `mode` | Active ACL mode: `read_execute`, `read_execute_describe`, `full`, or `custom` |
-| `permissions` | Per-domain map of authorized operations — only operations with an existing tool are listed |
+| `authorized_tools` | List of tool names the client is currently allowed to call. `acl_list` is always included. |
 
 ---
 

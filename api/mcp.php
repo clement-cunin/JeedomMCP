@@ -444,30 +444,43 @@ function tool_acl_list(): array {
         'full'                  => ['read', 'execution', 'set_description', 'create', 'update', 'delete'],
     ];
 
-    // ops that have no tool for a given domain
-    $no_tool = [
-        'devices'   => ['create', 'update', 'delete'],
-        'rooms'     => ['execution'],
-        'scenarios' => [],
+    // tool => [domain, operation]
+    $tool_map = [
+        'devices_list'           => ['devices',   'read'],
+        'device_state'           => ['devices',   'read'],
+        'devices_states'         => ['devices',   'read'],
+        'command_execute'        => ['devices',   'execution'],
+        'device_set_description' => ['devices',   'set_description'],
+        'rooms_list'             => ['rooms',     'read'],
+        'room_set_description'   => ['rooms',     'set_description'],
+        'room_create'            => ['rooms',     'create'],
+        'room_update'            => ['rooms',     'update'],
+        'room_delete'            => ['rooms',     'delete'],
+        'scenarios_list'         => ['scenarios', 'read'],
+        'scenario_get_actions'   => ['scenarios', 'read'],
+        'scenario_run'           => ['scenarios', 'execution'],
+        'scenario_set_description' => ['scenarios', 'set_description'],
+        'scenario_create'        => ['scenarios', 'create'],
+        'scenario_update'        => ['scenarios', 'update'],
+        'scenario_set_actions'   => ['scenarios', 'update'],
+        'scenario_delete'        => ['scenarios', 'delete'],
     ];
 
-    $all_ops = ['read', 'execution', 'set_description', 'create', 'update', 'delete'];
-    $permissions = [];
+    $allowed_ops = $mode_ops[$mode] ?? ['read', 'execution'];
 
-    foreach ($no_tool as $domain => $excluded_ops) {
-        $permissions[$domain] = [];
-        foreach ($all_ops as $op) {
-            if (in_array($op, $excluded_ops)) continue;
-            if ($mode === 'custom') {
-                $allowed = config::byKey("acl_{$domain}_{$op}", 'JeedomMCP', '0') == 1;
-            } else {
-                $allowed = in_array($op, $mode_ops[$mode] ?? ['read', 'execution']);
-            }
-            $permissions[$domain][$op] = $allowed;
+    $authorized = ['acl_list']; // always accessible
+    foreach ($tool_map as $tool => $domain_op) {
+        $domain = $domain_op[0];
+        $op     = $domain_op[1];
+        if ($mode === 'custom') {
+            $ok = config::byKey("acl_{$domain}_{$op}", 'JeedomMCP', '0') == 1;
+        } else {
+            $ok = in_array($op, $allowed_ops);
         }
+        if ($ok) $authorized[] = $tool;
     }
 
-    return ['mode' => $mode, 'permissions' => $permissions];
+    return ['mode' => $mode, 'authorized_tools' => $authorized];
 }
 
 function tool_devices_list(?array $categories = null): array {
