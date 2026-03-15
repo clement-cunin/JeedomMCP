@@ -464,14 +464,23 @@ function tool_device_state(int $equipment_id): array {
     ];
 }
 
+function fmt_equipment(eqLogic $eq): array {
+    return [
+        'id'          => intval($eq->getId()),
+        'name'        => $eq->getName() ?? '',
+        'description' => $eq->getComment() ?: null,
+        'object_id'   => $eq->getObject_id() ?: null,
+        'categories'  => active_categories($eq->getCategory()),
+        'is_visible'  => $eq->getIsVisible() == 1,
+    ];
+}
+
 function tool_device_set_description(int $equipment_id, string $description): array {
     $eq = eqLogic::byId($equipment_id);
-    if (!is_object($eq)) {
-        return ['error' => "Equipment {$equipment_id} not found"];
-    }
+    if (!is_object($eq)) throw new Exception("Equipment {$equipment_id} not found");
     $eq->setComment($description);
     $eq->save();
-    return ['success' => true, 'equipment_id' => $equipment_id, 'description' => $description];
+    return fmt_equipment($eq);
 }
 
 function tool_devices_states(?array $equipment_ids, ?array $categories = null): array {
@@ -541,9 +550,7 @@ function tool_command_execute(int $command_id, ?string $value): array {
     $cmd->execCmd($options);
 
     $eq = $cmd->getEqLogic();
-    if (!is_object($eq)) {
-        return ['success' => true, 'command_id' => $command_id];
-    }
+    if (!is_object($eq)) throw new Exception("Equipment for command {$command_id} not found");
     $commands = [];
     foreach (cmd::byEqLogicId($eq->getId()) as $c) {
         $commands[] = [
@@ -556,11 +563,10 @@ function tool_command_execute(int $command_id, ?string $value): array {
         ];
     }
     return [
-        'success'      => true,
-        'command_id'   => $command_id,
         'equipment_id' => intval($eq->getId()),
         'name'         => $eq->getName() ?? '',
         'description'  => $eq->getComment() ?: null,
+        'categories'   => active_categories($eq->getCategory()),
         'commands'     => $commands,
     ];
 }
@@ -652,7 +658,7 @@ function tool_room_set_description(int $room_id, string $description): array {
     }
     $obj->setConfiguration('description', $description);
     $obj->save();
-    return ['success' => true, 'room_id' => $room_id, 'description' => $description];
+    return fmt_room($obj);
 }
 
 function tool_scenarios_list(): array {
@@ -704,7 +710,7 @@ function tool_scenario_set_actions(int $scenario_id, array $elements): array {
     }
     $s->setScenarioElement($element_list);
     $s->save();
-    return ['success' => true, 'scenario_id' => $scenario_id];
+    return fmt_scenario($s);
 }
 
 function tool_scenario_set_description(int $scenario_id, string $description): array {
@@ -714,7 +720,7 @@ function tool_scenario_set_description(int $scenario_id, string $description): a
     }
     $s->setDescription($description);
     $s->save();
-    return ['success' => true, 'scenario_id' => $scenario_id, 'description' => $description];
+    return fmt_scenario($s);
 }
 
 function tool_scenario_update(array $args): array {
@@ -730,7 +736,7 @@ function tool_scenario_update(array $args): array {
     if (isset($args['is_active']))   $s->setIsActive($args['is_active'] ? 1 : 0);
     if (isset($args['description'])) $s->setDescription($args['description']);
     $s->save();
-    return ['success' => true, 'scenario_id' => $scenario_id];
+    return fmt_scenario($s);
 }
 
 function tool_scenario_create(array $args): array {
@@ -752,5 +758,5 @@ function tool_scenario_create(array $args): array {
     if (!$s->getId()) {
         return ['error' => 'Scenario creation failed: no ID returned'];
     }
-    return array_merge(['success' => true], fmt_scenario($s));
+    return fmt_scenario($s);
 }

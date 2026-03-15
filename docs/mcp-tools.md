@@ -70,10 +70,10 @@ Sets the description (comment field) of a Jeedom equipment.
 | `equipment_id` | int | yes | Equipment ID (from `devices_list`) |
 | `description` | string | yes | Description text explaining the equipment's purpose or location |
 
-**Returns**:
+**Returns**: updated equipment object
 
 ```json
-{ "success": true, "equipment_id": 42, "description": "Main living room ceiling light" }
+{ "id": 42, "name": "Living room light", "description": "Main living room ceiling light", "object_id": "12", "categories": ["light"], "is_visible": true }
 ```
 
 ---
@@ -121,13 +121,14 @@ Executes an action command on a Jeedom equipment.
 | `command_id` | int | yes | Command ID (from `device_state`) |
 | `value` | string | no | Value for slider/text commands |
 
-**Returns**: updated equipment state after execution
+**Returns**: updated equipment state (same structure as `device_state`)
 
 ```json
 {
-  "success": true,
-  "command_id": 103,
   "equipment_id": 42,
+  "name": "Living room light",
+  "description": "Ceiling light, Z-Wave dimmer",
+  "categories": ["light"],
   "commands": [
     { "id": 101, "name": "State", "logicalId": "state", "type": "info", "subType": "binary", "value": "1" },
     { "id": 103, "name": "On", "logicalId": "on", "type": "action", "subType": "other", "value": null }
@@ -253,8 +254,10 @@ Sets the description of a Jeedom room.
 
 **Returns**:
 
+**Returns**: updated room object
+
 ```json
-{ "success": true, "room_id": 2, "description": "Pièce principale avec accès cuisine" }
+{ "id": 2, "name": "Salon", "description": "Pièce principale avec accès cuisine", "icon": null, "surface": "35", "orientation": 180, "parent_id": 14 }
 ```
 
 ---
@@ -353,8 +356,10 @@ Replaces the action blocks of a Jeedom scenario. The `elements` structure mirror
 
 **Returns**:
 
+**Returns**: updated scenario object (same structure as `scenarios_list`)
+
 ```json
-{ "success": true, "scenario_id": 3 }
+{ "id": 3, "name": "Evening mode", "group": null, "description": "", "is_active": true, "state": "stop", "mode": "schedule", "schedule": "30 21 * * *", "trigger": null, "last_launch": null }
 ```
 
 ---
@@ -372,8 +377,10 @@ Sets the description of a Jeedom scenario.
 
 **Returns**:
 
+**Returns**: updated scenario object
+
 ```json
-{ "success": true, "scenario_id": 5, "description": "Turns off all lights and locks doors at bedtime" }
+{ "id": 5, "name": "Evening mode", "group": "Ambiance", "description": "Turns off all lights and locks doors at bedtime", "is_active": true, "state": "stop", "mode": "schedule", "schedule": "30 21 * * *", "trigger": null, "last_launch": "2026-03-11 21:30:03" }
 ```
 
 ---
@@ -396,8 +403,10 @@ Updates fields of an existing Jeedom scenario. Only provided fields are modified
 
 **Returns**:
 
+**Returns**: updated scenario object
+
 ```json
-{ "success": true, "scenario_id": 5 }
+{ "id": 5, "name": "Evening mode", "group": "Ambiance", "description": "", "is_active": false, "state": "stop", "mode": "schedule", "schedule": "0 23 * * *", "trigger": null, "last_launch": "2026-03-11 21:30:03" }
 ```
 
 ---
@@ -421,7 +430,6 @@ Creates a new Jeedom scenario.
 
 ```json
 {
-  "success": true,
   "id": 12,
   "name": "Morning routine",
   "group": null,
