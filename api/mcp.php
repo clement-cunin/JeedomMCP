@@ -424,7 +424,7 @@ function tool_devices_list(?array $categories = null): array {
             'id'          => intval($eq->getId()),
             'name'        => $eq->getName() ?? '',
             'description' => $eq->getComment() ?: null,
-            'object_id'   => $eq->getObject_id() ?: null,
+            'object_id'   => $eq->getObject_id() ? intval($eq->getObject_id()) : null,
             'object_name' => $object_map[$eq->getObject_id()] ?? null,
             'categories'  => $eq_cats,
             'is_visible'  => $eq->getIsVisible() == 1,
@@ -469,7 +469,7 @@ function fmt_equipment(eqLogic $eq): array {
         'id'          => intval($eq->getId()),
         'name'        => $eq->getName() ?? '',
         'description' => $eq->getComment() ?: null,
-        'object_id'   => $eq->getObject_id() ?: null,
+        'object_id'   => $eq->getObject_id() ? intval($eq->getObject_id()) : null,
         'categories'  => active_categories($eq->getCategory()),
         'is_visible'  => $eq->getIsVisible() == 1,
     ];
@@ -574,16 +574,7 @@ function tool_command_execute(int $command_id, ?string $value): array {
 function tool_rooms_list(): array {
     $result = [];
     foreach (jeeObject::all() as $obj) {
-        $orientation_raw = $obj->getConfiguration('info::orientation');
-        $result[] = [
-            'id'          => intval($obj->getId()),
-            'name'        => $obj->getName() ?? '',
-            'description' => $obj->getConfiguration('description') ?: null,
-            'icon'        => extract_icon($obj->getDisplay('icon') ?? ''),
-            'surface'     => $obj->getConfiguration('info::space') ?: null,
-            'orientation' => ($orientation_raw !== '' && $orientation_raw !== null) ? intval($orientation_raw) : null,
-            'parent_id'   => $obj->getFather_id() ? intval($obj->getFather_id()) : null,
-        ];
+        $result[] = fmt_room($obj);
     }
     return $result;
 }
