@@ -7,6 +7,7 @@ A Jeedom plugin that exposes an [MCP (Model Context Protocol)](https://modelcont
 - [Installation guide](docs/installation.md)
 - [Configuration reference](docs/configuration.md)
 - [MCP tools reference](docs/mcp-tools.md)
+- [Development guide](docs/development.md)
 
 ## License
 
