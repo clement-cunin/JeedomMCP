@@ -148,7 +148,7 @@ function mcp_get_tools(): array {
     return [
         [
             'name'        => 'devices_list',
-            'description' => 'List all enabled Jeedom equipment.',
+            'description' => 'List all enabled Jeedom equipment. Returns a paginated response.',
             'inputSchema' => [
                 'type'       => 'object',
                 'properties' => [
@@ -157,6 +157,8 @@ function mcp_get_tools(): array {
                         'items'       => ['type' => 'string', 'enum' => ['heating', 'security', 'energy', 'light', 'opening', 'automatism', 'multimedia', 'default']],
                         'description' => 'Filter by category — returns equipment matching at least one.',
                     ],
+                    'limit'  => ['type' => 'integer', 'description' => 'Maximum number of items to return (default 50). Use 0 for no limit.'],
+                    'offset' => ['type' => 'integer', 'description' => 'Number of items to skip (default 0).'],
                 ],
                 'required' => [],
             ],
@@ -184,7 +186,7 @@ function mcp_get_tools(): array {
         ],
         [
             'name'        => 'devices_states',
-            'description' => 'Get the current state of all equipment and their commands in a single call.',
+            'description' => 'Get the current state of all equipment and their commands in a single call. Returns a paginated response.',
             'inputSchema' => [
                 'type'       => 'object',
                 'properties' => [
@@ -198,6 +200,8 @@ function mcp_get_tools(): array {
                         'items'       => ['type' => 'string', 'enum' => ['heating', 'security', 'energy', 'light', 'opening', 'automatism', 'multimedia', 'default']],
                         'description' => 'Filter by category — returns equipment matching at least one.',
                     ],
+                    'limit'  => ['type' => 'integer', 'description' => 'Maximum number of items to return (default 50). Use 0 for no limit.'],
+                    'offset' => ['type' => 'integer', 'description' => 'Number of items to skip (default 0).'],
                 ],
                 'required' => [],
             ],
@@ -216,8 +220,15 @@ function mcp_get_tools(): array {
         ],
         [
             'name'        => 'rooms_list',
-            'description' => 'List all rooms (objects) in the Jeedom home.',
-            'inputSchema' => ['type' => 'object', 'properties' => new stdClass(), 'required' => []],
+            'description' => 'List all rooms (objects) in the Jeedom home. Returns a paginated response.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'limit'  => ['type' => 'integer', 'description' => 'Maximum number of items to return (default 50). Use 0 for no limit.'],
+                    'offset' => ['type' => 'integer', 'description' => 'Number of items to skip (default 0).'],
+                ],
+                'required' => [],
+            ],
         ],
         [
             'name'        => 'room_set_description',
@@ -281,8 +292,15 @@ function mcp_get_tools(): array {
         ],
         [
             'name'        => 'scenarios_list',
-            'description' => 'List all Jeedom scenarios.',
-            'inputSchema' => ['type' => 'object', 'properties' => new stdClass(), 'required' => []],
+            'description' => 'List all Jeedom scenarios. Returns a paginated response.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'limit'  => ['type' => 'integer', 'description' => 'Maximum number of items to return (default 50). Use 0 for no limit.'],
+                    'offset' => ['type' => 'integer', 'description' => 'Number of items to skip (default 0).'],
+                ],
+                'required' => [],
+            ],
         ],
         [
             'name'        => 'scenario_run',
@@ -379,17 +397,17 @@ function mcp_call_tool(string $name, array $args): array {
     try {
         switch ($name) {
             case 'acl_list':            return tool_result(tool_acl_list());
-            case 'devices_list':        return tool_result(tool_devices_list($args['categories'] ?? null));
+            case 'devices_list':        return tool_result(tool_devices_list($args['categories'] ?? null, intval($args['limit'] ?? 50), intval($args['offset'] ?? 0)));
             case 'device_state':        return tool_result(tool_device_state((int)($args['equipment_id'] ?? 0)));
             case 'device_set_description': return tool_result(tool_device_set_description((int)($args['equipment_id'] ?? 0), (string)($args['description'] ?? '')));
-            case 'devices_states':      return tool_result(tool_devices_states($args['equipment_ids'] ?? null, $args['categories'] ?? null));
+            case 'devices_states':      return tool_result(tool_devices_states($args['equipment_ids'] ?? null, $args['categories'] ?? null, intval($args['limit'] ?? 50), intval($args['offset'] ?? 0)));
             case 'command_execute':     return tool_result(tool_command_execute((int)($args['command_id'] ?? 0), $args['value'] ?? null));
-            case 'rooms_list':          return tool_result(tool_rooms_list());
+            case 'rooms_list':          return tool_result(tool_rooms_list(intval($args['limit'] ?? 50), intval($args['offset'] ?? 0)));
             case 'room_set_description': return tool_result(tool_room_set_description((int)($args['room_id'] ?? 0), (string)($args['description'] ?? '')));
             case 'room_create':         return tool_result(tool_room_create((string)($args['name'] ?? ''), $args['description'] ?? null, $args['surface'] ?? null, isset($args['orientation']) ? (int)$args['orientation'] : null, isset($args['parent_id']) ? (int)$args['parent_id'] : null));
             case 'room_update':         return tool_result(tool_room_update((int)($args['room_id'] ?? 0), $args));
             case 'room_delete':         return tool_result(tool_room_delete((int)($args['room_id'] ?? 0)));
-            case 'scenarios_list':      return tool_result(tool_scenarios_list());
+            case 'scenarios_list':      return tool_result(tool_scenarios_list(intval($args['limit'] ?? 50), intval($args['offset'] ?? 0)));
             case 'scenario_run':        return tool_result(tool_scenario_run((int)($args['scenario_id'] ?? 0)));
             case 'scenario_delete':     return tool_result(tool_scenario_delete((int)($args['scenario_id'] ?? 0)));
             case 'scenario_get_actions': return tool_result(tool_scenario_get_actions((int)($args['scenario_id'] ?? 0)));
@@ -483,19 +501,19 @@ function tool_acl_list(): array {
     return ['mode' => $mode, 'authorized_tools' => $authorized];
 }
 
-function tool_devices_list(?array $categories = null): array {
+function tool_devices_list(?array $categories = null, int $limit = 50, int $offset = 0): array {
     acl_check('devices', 'read');
     $object_map = [];
     foreach (jeeObject::all() as $obj) {
         $object_map[$obj->getId()] = $obj->getName();
     }
 
-    $result = [];
+    $all = [];
     foreach (eqLogic::all() as $eq) {
         if ($eq->getIsEnable() != 1) continue;
         $eq_cats = active_categories($eq->getCategory());
         if (!empty($categories) && empty(array_intersect($categories, $eq_cats))) continue;
-        $result[] = [
+        $all[] = [
             'id'          => intval($eq->getId()),
             'name'        => $eq->getName() ?? '',
             'description' => $eq->getComment() ?: null,
@@ -505,7 +523,10 @@ function tool_devices_list(?array $categories = null): array {
             'is_visible'  => $eq->getIsVisible() == 1,
         ];
     }
-    return $result;
+
+    $total = count($all);
+    $items = $limit > 0 ? array_slice($all, $offset, $limit) : array_slice($all, $offset);
+    return ['total' => $total, 'offset' => $offset, 'limit' => $limit, 'items' => $items];
 }
 
 function tool_device_state(int $equipment_id): array {
@@ -560,7 +581,7 @@ function tool_device_set_description(int $equipment_id, string $description): ar
     return fmt_equipment($eq);
 }
 
-function tool_devices_states(?array $equipment_ids, ?array $categories = null): array {
+function tool_devices_states(?array $equipment_ids, ?array $categories = null, int $limit = 50, int $offset = 0): array {
     acl_check('devices', 'read');
     $object_map = [];
     foreach (jeeObject::all() as $obj) {
@@ -585,7 +606,7 @@ function tool_devices_states(?array $equipment_ids, ?array $categories = null): 
         }
     }
 
-    $result = [];
+    $all = [];
     foreach (eqLogic::all() as $eq) {
         if ($eq->getIsEnable() != 1) continue;
         if ($equipment_ids !== null && !in_array((int)$eq->getId(), $equipment_ids)) continue;
@@ -606,7 +627,7 @@ function tool_devices_states(?array $equipment_ids, ?array $categories = null): 
             ];
         }
 
-        $result[] = [
+        $all[] = [
             'id'          => intval($eq->getId()),
             'name'        => $eq->getName() ?? '',
             'description' => $eq->getComment() ?: null,
@@ -616,7 +637,10 @@ function tool_devices_states(?array $equipment_ids, ?array $categories = null): 
             'commands'    => $commands,
         ];
     }
-    return $result;
+
+    $total = count($all);
+    $items = $limit > 0 ? array_slice($all, $offset, $limit) : array_slice($all, $offset);
+    return ['total' => $total, 'offset' => $offset, 'limit' => $limit, 'items' => $items];
 }
 
 function tool_command_execute(int $command_id, ?string $value): array {
@@ -650,13 +674,15 @@ function tool_command_execute(int $command_id, ?string $value): array {
     ];
 }
 
-function tool_rooms_list(): array {
+function tool_rooms_list(int $limit = 50, int $offset = 0): array {
     acl_check('rooms', 'read');
-    $result = [];
+    $all = [];
     foreach (jeeObject::all() as $obj) {
-        $result[] = fmt_room($obj);
+        $all[] = fmt_room($obj);
     }
-    return $result;
+    $total = count($all);
+    $items = $limit > 0 ? array_slice($all, $offset, $limit) : array_slice($all, $offset);
+    return ['total' => $total, 'offset' => $offset, 'limit' => $limit, 'items' => $items];
 }
 
 function tool_room_create(string $name, ?string $description, ?string $surface, ?int $orientation, ?int $parent_id): array {
@@ -745,13 +771,15 @@ function tool_room_set_description(int $room_id, string $description): array {
     return fmt_room($obj);
 }
 
-function tool_scenarios_list(): array {
+function tool_scenarios_list(int $limit = 50, int $offset = 0): array {
     acl_check('scenarios', 'read');
-    $result = [];
+    $all = [];
     foreach (scenario::all() as $s) {
-        $result[] = fmt_scenario($s);
+        $all[] = fmt_scenario($s);
     }
-    return $result;
+    $total = count($all);
+    $items = $limit > 0 ? array_slice($all, $offset, $limit) : array_slice($all, $offset);
+    return ['total' => $total, 'offset' => $offset, 'limit' => $limit, 'items' => $items];
 }
 
 function tool_scenario_run(int $scenario_id): array {

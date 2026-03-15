@@ -38,28 +38,35 @@ Returns the current ACL mode and all authorized operations. Call this first to k
 
 ## `devices_list`
 
-Lists all enabled Jeedom equipment.
+Lists all enabled Jeedom equipment. Returns a paginated response.
 
 **Parameters**:
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `categories` | string[] | no | Filter by category — returns equipment matching at least one. Valid values: `heating`, `security`, `energy`, `light`, `opening`, `automatism`, `multimedia`, `default` |
+| `limit` | int | no | Maximum number of items to return (default: 50). Use 0 for no limit. |
+| `offset` | int | no | Number of items to skip (default: 0). |
 
-**Returns**: JSON array of equipment
+**Returns**: paginated object
 
 ```json
-[
-  {
-    "id": 42,
-    "name": "Living room light",
-    "description": "Ceiling light, Z-Wave dimmer",
-    "object_id": "12",
-    "object_name": "Living room",
-    "categories": ["light"],
-    "is_visible": true
-  }
-]
+{
+  "total": 87,
+  "offset": 0,
+  "limit": 50,
+  "items": [
+    {
+      "id": 42,
+      "name": "Living room light",
+      "description": "Ceiling light, Z-Wave dimmer",
+      "object_id": 12,
+      "object_name": "Living room",
+      "categories": ["light"],
+      "is_visible": true
+    }
+  ]
+}
 ```
 
 ---
@@ -112,7 +119,7 @@ Sets the description (comment field) of a Jeedom equipment.
 
 ## `devices_states`
 
-Gets the current state of all equipment and their commands in a single call (3 API requests total).
+Gets the current state of all equipment and their commands in a single call. Returns a paginated response.
 
 **Parameters**:
 
@@ -120,24 +127,31 @@ Gets the current state of all equipment and their commands in a single call (3 A
 |-----------|------|----------|-------------|
 | `equipment_ids` | int[] | no | Filter to specific equipment IDs. If omitted, returns all enabled equipment. |
 | `categories` | string[] | no | Filter by category — returns equipment matching at least one. Valid values: `heating`, `security`, `energy`, `light`, `opening`, `automatism`, `multimedia`, `default` |
+| `limit` | int | no | Maximum number of items to return (default: 50). Use 0 for no limit. |
+| `offset` | int | no | Number of items to skip (default: 0). |
 
-**Returns**: JSON array of equipment with their commands and current values
+**Returns**: paginated object with equipment and their commands
 
 ```json
-[
-  {
-    "id": 42,
-    "name": "Living room light",
-    "description": "Ceiling light, Z-Wave dimmer",
-    "object_name": "Living room",
-    "categories": ["light"],
-    "is_visible": true,
-    "commands": [
-      { "id": 101, "name": "State", "logicalId": "state", "type": "info", "subType": "binary", "value": "1" },
-      { "id": 103, "name": "On", "logicalId": "on", "type": "action", "subType": "other", "value": null }
-    ]
-  }
-]
+{
+  "total": 87,
+  "offset": 0,
+  "limit": 50,
+  "items": [
+    {
+      "id": 42,
+      "name": "Living room light",
+      "description": "Ceiling light, Z-Wave dimmer",
+      "object_name": "Living room",
+      "categories": ["light"],
+      "is_visible": true,
+      "commands": [
+        { "id": 101, "name": "State", "logicalId": "state", "type": "info", "subType": "binary", "value": "1" },
+        { "id": 103, "name": "On", "logicalId": "on", "type": "action", "subType": "other", "value": null }
+      ]
+    }
+  ]
+}
 ```
 
 ---
@@ -178,24 +192,34 @@ Executes an action command on a Jeedom equipment.
 
 ## `rooms_list`
 
-Lists all rooms (Jeedom objects) in the home.
+Lists all rooms (Jeedom objects) in the home. Returns a paginated response.
 
-**Parameters**: none
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `limit` | int | no | Maximum number of items to return (default: 50). Use 0 for no limit. |
+| `offset` | int | no | Number of items to skip (default: 0). |
 
 **Returns**:
 
 ```json
-[
-  {
-    "id": 2,
-    "name": "Salon",
-    "description": "Pièce principale avec accès cuisine",
-    "icon": "icon maison-sofa5",
-    "surface": "30",
-    "orientation": 180,
-    "parent_id": null
-  }
-]
+{
+  "total": 12,
+  "offset": 0,
+  "limit": 50,
+  "items": [
+    {
+      "id": 2,
+      "name": "Salon",
+      "description": "Pièce principale avec accès cuisine",
+      "icon": "icon maison-sofa5",
+      "surface": "30",
+      "orientation": 180,
+      "parent_id": null
+    }
+  ]
+}
 ```
 
 | Field | Description |
@@ -296,27 +320,37 @@ Sets the description of a Jeedom room.
 
 ## `scenarios_list`
 
-Lists all Jeedom scenarios.
+Lists all Jeedom scenarios. Returns a paginated response.
 
-**Parameters**: none
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `limit` | int | no | Maximum number of items to return (default: 50). Use 0 for no limit. |
+| `offset` | int | no | Number of items to skip (default: 0). |
 
 **Returns**:
 
 ```json
-[
-  {
-    "id": 5,
-    "name": "Evening mode",
-    "group": "Ambiance",
-    "description": "Turns on lights and sets heating at sunset",
-    "is_active": true,
-    "state": "stop",
-    "mode": "schedule",
-    "schedule": "30 21 * * *",
-    "trigger": null,
-    "last_launch": "2026-03-11 21:30:03"
-  }
-]
+{
+  "total": 8,
+  "offset": 0,
+  "limit": 50,
+  "items": [
+    {
+      "id": 5,
+      "name": "Evening mode",
+      "group": "Ambiance",
+      "description": "Turns on lights and sets heating at sunset",
+      "is_active": true,
+      "state": "stop",
+      "mode": "schedule",
+      "schedule": "30 21 * * *",
+      "trigger": null,
+      "last_launch": "2026-03-11 21:30:03"
+    }
+  ]
+}
 ```
 
 | Field | Description |
