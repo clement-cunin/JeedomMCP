@@ -97,6 +97,42 @@ Add a section following the existing format: description, parameters table, retu
 
 Use shared `fmt_*` helpers so all tools that return the same entity produce identical output.
 
+### Pagination — mandatory for all `*_list` tools
+
+Every tool that returns a collection **must** be paginated. Standard signature:
+
+```php
+function tool_foo_list(int $limit = 50, int $offset = 0): array {
+    $all = [];
+    foreach (FooClass::all() as $item) {
+        // optional filters here
+        $all[] = fmt_foo($item);
+    }
+    $total = count($all);
+    $items = $limit > 0 ? array_slice($all, $offset, $limit) : array_slice($all, $offset);
+    return ['total' => $total, 'offset' => $offset, 'limit' => $limit, 'items' => $items];
+}
+```
+
+Schema parameters to add to every list tool:
+
+```php
+'limit'  => ['type' => 'integer', 'description' => 'Maximum number of items to return (default 50). Use 0 for no limit.'],
+'offset' => ['type' => 'integer', 'description' => 'Number of items to skip (default 0).'],
+```
+
+Dispatch:
+
+```php
+case 'foo_list': return tool_result(tool_foo_list(intval($args['limit'] ?? 50), intval($args['offset'] ?? 0)));
+```
+
+Rules:
+- `limit = 0` means no limit (return all items from `offset`)
+- Always return `total` (count before pagination) so the client can detect whether more pages exist
+- Apply filters **before** `array_slice`, so `total` reflects the filtered count
+- Document with the paginated JSON shape in `docs/mcp-tools.md`
+
 ---
 
 ## PHP 7.3 compatibility
