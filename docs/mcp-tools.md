@@ -8,7 +8,11 @@ List of tools exposed by the JeedomMCP server.
 
 Lists all enabled Jeedom equipment.
 
-**Parameters**: none
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `categories` | string[] | no | Filter by category — returns equipment matching at least one. Valid values: `heating`, `security`, `energy`, `light`, `opening`, `automatism`, `multimedia`, `default` |
 
 **Returns**: JSON array of equipment
 
@@ -83,6 +87,7 @@ Gets the current state of all equipment and their commands in a single call (3 A
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `equipment_ids` | int[] | no | Filter to specific equipment IDs. If omitted, returns all enabled equipment. |
+| `categories` | string[] | no | Filter by category — returns equipment matching at least one. Valid values: `heating`, `security`, `energy`, `light`, `opening`, `automatism`, `multimedia`, `default` |
 
 **Returns**: JSON array of equipment with their commands and current values
 
@@ -152,6 +157,7 @@ Lists all rooms (Jeedom objects) in the home.
     "id": 2,
     "name": "Salon",
     "description": "Pièce principale avec accès cuisine",
+    "icon": "icon maison-sofa5",
     "surface": "30",
     "orientation": 180,
     "parent_id": null
@@ -162,6 +168,7 @@ Lists all rooms (Jeedom objects) in the home.
 | Field | Description |
 |-------|-------------|
 | `description` | Free-text description, or `null` |
+| `icon` | CSS icon class (e.g. `"icon maison-wc"` or `"fas fa-home"`), or `null` |
 | `surface` | Floor area in square metres, or `null` |
 | `orientation` | Orientation as degrees — one of 8 values: `0`=N, `45`=NE, `90`=E, `135`=SE, `180`=S, `225`=SW, `270`=W, `315`=NW, or `null` |
 | `parent_id` | ID of the parent room, or `null` for top-level rooms |
@@ -178,6 +185,7 @@ Creates a new room in the Jeedom home.
 |-----------|------|----------|-------------|
 | `name` | string | yes | Display name of the room |
 | `description` | string | no | Description text explaining the room |
+| `icon` | string | no | CSS icon class (e.g. `"icon maison-wc"` or `"fas fa-home"`) |
 | `surface` | string | no | Floor area in square metres (e.g. `"15.5"`) |
 | `orientation` | string | no | Orientation in degrees — one of: `0`, `45`, `90`, `135`, `180`, `225`, `270`, `315` |
 | `parent_id` | int | no | Parent room ID for nested rooms (from `rooms_list`) |
@@ -185,7 +193,7 @@ Creates a new room in the Jeedom home.
 **Returns**:
 
 ```json
-{ "id": 12, "name": "Bureau", "description": null, "surface": "12", "orientation": 0, "parent_id": 1 }
+{ "id": 12, "name": "Bureau", "description": null, "icon": null, "surface": "12", "orientation": 0, "parent_id": 1 }
 ```
 
 ---
@@ -201,6 +209,7 @@ Updates a Jeedom room. Only provided fields are modified.
 | `room_id` | int | yes | Room ID (from `rooms_list`) |
 | `name` | string | no | New display name |
 | `description` | string | no | New description text |
+| `icon` | string | no | CSS icon class (e.g. `"icon maison-wc"`). Pass `""` to clear |
 | `surface` | string | no | Floor area in square metres |
 | `orientation` | string | no | Orientation in degrees — one of: `0`, `45`, `90`, `135`, `180`, `225`, `270`, `315` |
 | `parent_id` | int | no | New parent room ID. Pass `0` to move to top level |
@@ -208,7 +217,7 @@ Updates a Jeedom room. Only provided fields are modified.
 **Returns**:
 
 ```json
-{ "id": 2, "name": "Salon", "description": "Pièce principale", "surface": "30", "orientation": 180, "parent_id": null }
+{ "id": 2, "name": "Salon", "description": "Pièce principale", "icon": "icon maison-sofa5", "surface": "30", "orientation": 180, "parent_id": null }
 ```
 
 ---
