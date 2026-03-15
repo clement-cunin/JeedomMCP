@@ -4,20 +4,27 @@ if (!isConnect('admin')) {
 }
 $mcpUrl = network::getNetworkAccess('external', 'proto:ip:port:comp') . '/plugins/JeedomMCP/api/mcp.php';
 
-// ACL matrix definition: domain => [op => has_tool]
+// ACL matrix: domain => [op => has_tool]
 $acl_matrix = [
     'devices'   => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => false, 'update' => false, 'delete' => false],
     'rooms'     => ['read' => true, 'execution' => false, 'set_description' => true, 'create' => true, 'update' => true, 'delete' => true],
     'scenarios' => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => true, 'update' => true, 'delete' => true],
 ];
 
-// Initialize defaults to '1' (enabled) for cells that have a tool and were never explicitly configured
+// Default preset: "Read & Execute"
+$acl_defaults = [
+    'read' => '1', 'execution' => '1',
+    'set_description' => '0', 'create' => '0', 'update' => '0', 'delete' => '0',
+];
+
+// Initialize config values on first load (robust check: only skip if already '0' or '1')
 foreach ($acl_matrix as $domain => $ops) {
     foreach ($ops as $op => $has_tool) {
         if (!$has_tool) continue;
         $key = "acl_{$domain}_{$op}";
-        if (config::byKey($key, 'JeedomMCP', null) === null) {
-            config::save($key, '1', 'JeedomMCP');
+        $current = (string)config::byKey($key, 'JeedomMCP');
+        if (!in_array($current, ['0', '1'], true)) {
+            config::save($key, $acl_defaults[$op], 'JeedomMCP');
         }
     }
 }
@@ -77,8 +84,20 @@ $acl_op_labels = [
         <legend><i class="fas fa-shield-alt"></i> {{Tool permissions}}</legend>
 
         <div class="form-group">
+            <label class="col-sm-4 control-label">{{Preset}}</label>
+            <div class="col-sm-4">
+                <select id="acl_preset" class="form-control">
+                    <option value="read_execute">{{Read &amp; Execute}}</option>
+                    <option value="read_execute_describe">{{Read, Execute &amp; Set description}}</option>
+                    <option value="full">{{Full access}}</option>
+                    <option value="custom">{{Custom}}</option>
+                </select>
+            </div>
+            <span class="help-block col-sm-4">{{Quick preset — applies to all domains at once.}}</span>
+        </div>
+
+        <div class="form-group">
             <div class="col-sm-offset-1 col-sm-11">
-                <p class="help-block">{{Select which operations the LLM is authorized to perform. Uncheck an operation to block it — the tool will return an error if called. All operations are enabled by default.}}</p>
                 <table class="table table-bordered table-condensed" style="width:auto">
                     <thead>
                         <tr>
@@ -95,7 +114,10 @@ $acl_op_labels = [
                             <?php foreach ($ops as $op => $has_tool): ?>
                             <td class="text-center" style="vertical-align:middle;<?php echo $has_tool ? '' : 'background:#f5f5f5;'; ?>">
                                 <?php if ($has_tool): ?>
-                                <input type="checkbox" class="configKey" data-l1key="acl_<?php echo $domain; ?>_<?php echo $op; ?>" />
+                                <input type="checkbox"
+                                       class="configKey acl-checkbox"
+                                       data-l1key="acl_<?php echo $domain; ?>_<?php echo $op; ?>"
+                                       data-op="<?php echo $op; ?>" />
                                 <?php else: ?>
                                 <span class="text-muted">—</span>
                                 <?php endif; ?>
@@ -113,6 +135,10 @@ $acl_op_labels = [
 
 <script>
 var mcpUrl = '<?php echo $mcpUrl; ?>';
+
+// ---------------------------------------------------------------------------
+// MCP JSON preview
+// ---------------------------------------------------------------------------
 
 function buildMcpJson() {
     var apikey = $('#inp_mcpApiKey').val() || '';
@@ -134,11 +160,12 @@ function updateMcpJsonPreview() {
 
 $('#inp_mcpApiKey').on('change', updateMcpJsonPreview);
 
-// Jeedom loads config values asynchronously after DOM ready — poll until populated
 var mcpJsonPollInterval = setInterval(function () {
     if ($('#inp_mcpApiKey').val()) {
         updateMcpJsonPreview();
         clearInterval(mcpJsonPollInterval);
+        // Config values are loaded — sync the preset selector
+        detectAclPreset();
     }
 }, 100);
 
@@ -178,5 +205,52 @@ $('#bt_copyApiKey').on('click', function () {
     navigator.clipboard.writeText(key).then(function () {
         $.fn.showAlert({ message: '{{API key copied to clipboard.}}', level: 'success' });
     });
+});
+
+// ---------------------------------------------------------------------------
+// ACL preset selector
+// ---------------------------------------------------------------------------
+
+var ACL_PRESETS = {
+    read_execute:          ['read', 'execution'],
+    read_execute_describe: ['read', 'execution', 'set_description'],
+    full:                  ['read', 'execution', 'set_description', 'create', 'update', 'delete']
+};
+
+function applyAclPreset(presetKey) {
+    var ops = ACL_PRESETS[presetKey];
+    if (!ops) return;
+    $('.acl-checkbox').each(function () {
+        $(this).prop('checked', ops.indexOf($(this).data('op')) !== -1);
+    });
+}
+
+function detectAclPreset() {
+    for (var presetKey in ACL_PRESETS) {
+        var ops = ACL_PRESETS[presetKey];
+        var matches = true;
+        $('.acl-checkbox').each(function () {
+            if ($(this).prop('checked') !== (ops.indexOf($(this).data('op')) !== -1)) {
+                matches = false;
+                return false;
+            }
+        });
+        if (matches) {
+            $('#acl_preset').val(presetKey);
+            return;
+        }
+    }
+    $('#acl_preset').val('custom');
+}
+
+$('#acl_preset').on('change', function () {
+    var val = $(this).val();
+    if (val !== 'custom') {
+        applyAclPreset(val);
+    }
+});
+
+$('.acl-checkbox').on('change', function () {
+    detectAclPreset();
 });
 </script>
