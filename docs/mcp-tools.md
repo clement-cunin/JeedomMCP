@@ -20,7 +20,7 @@ Lists all enabled Jeedom equipment.
     "description": "Ceiling light, Z-Wave dimmer",
     "object_id": "12",
     "object_name": "Living room",
-    "category": "light",
+    "categories": ["light"],
     "is_visible": true
   }
 ]
@@ -45,6 +45,7 @@ Gets the current state of a specific equipment and all its info commands.
   "equipment_id": 42,
   "name": "Living room light",
   "description": "Ceiling light, Z-Wave dimmer",
+  "categories": ["light"],
   "commands": [
     { "id": 101, "name": "State", "logicalId": "state", "type": "info", "subType": "binary", "value": "1" },
     { "id": 102, "name": "Brightness", "logicalId": "brightness", "type": "info", "subType": "numeric", "value": "75" }
@@ -92,7 +93,7 @@ Gets the current state of all equipment and their commands in a single call (3 A
     "name": "Living room light",
     "description": "Ceiling light, Z-Wave dimmer",
     "object_name": "Living room",
-    "category": "light",
+    "categories": ["light"],
     "is_visible": true,
     "commands": [
       { "id": 101, "name": "State", "logicalId": "state", "type": "info", "subType": "binary", "value": "1" },

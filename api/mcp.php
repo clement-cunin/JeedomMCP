@@ -129,7 +129,17 @@ function mcp_get_tools(): array {
         [
             'name'        => 'devices_list',
             'description' => 'List all enabled Jeedom equipment.',
-            'inputSchema' => ['type' => 'object', 'properties' => new stdClass(), 'required' => []],
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'categories' => [
+                        'type'        => 'array',
+                        'items'       => ['type' => 'string', 'enum' => ['heating', 'security', 'energy', 'light', 'opening', 'automatism', 'multimedia', 'default']],
+                        'description' => 'Filter by category — returns equipment matching at least one.',
+                    ],
+                ],
+                'required' => [],
+            ],
         ],
         [
             'name'        => 'device_state',
@@ -162,6 +172,11 @@ function mcp_get_tools(): array {
                         'type'        => 'array',
                         'items'       => ['type' => 'integer'],
                         'description' => 'Optional list of equipment IDs to filter. If omitted, returns all enabled equipment.',
+                    ],
+                    'categories' => [
+                        'type'        => 'array',
+                        'items'       => ['type' => 'string', 'enum' => ['heating', 'security', 'energy', 'light', 'opening', 'automatism', 'multimedia', 'default']],
+                        'description' => 'Filter by category — returns equipment matching at least one.',
                     ],
                 ],
                 'required' => [],
@@ -337,10 +352,10 @@ function mcp_get_tools(): array {
 function mcp_call_tool(string $name, array $args): array {
     try {
         switch ($name) {
-            case 'devices_list':        return tool_result(tool_devices_list());
+            case 'devices_list':        return tool_result(tool_devices_list($args['categories'] ?? null));
             case 'device_state':        return tool_result(tool_device_state((int)($args['equipment_id'] ?? 0)));
             case 'device_set_description': return tool_result(tool_device_set_description((int)($args['equipment_id'] ?? 0), (string)($args['description'] ?? '')));
-            case 'devices_states':      return tool_result(tool_devices_states($args['equipment_ids'] ?? null));
+            case 'devices_states':      return tool_result(tool_devices_states($args['equipment_ids'] ?? null, $args['categories'] ?? null));
             case 'command_execute':     return tool_result(tool_command_execute((int)($args['command_id'] ?? 0), $args['value'] ?? null));
             case 'rooms_list':          return tool_result(tool_rooms_list());
             case 'room_set_description': return tool_result(tool_room_set_description((int)($args['room_id'] ?? 0), (string)($args['description'] ?? '')));
@@ -388,7 +403,12 @@ function fmt_scenario(object $s): array {
     ];
 }
 
-function tool_devices_list(): array {
+function active_categories($raw): array {
+    if (!is_array($raw)) return [];
+    return array_keys(array_filter($raw, function($v) { return $v == 1; }));
+}
+
+function tool_devices_list(?array $categories = null): array {
     $object_map = [];
     foreach (jeeObject::all() as $obj) {
         $object_map[$obj->getId()] = $obj->getName();
@@ -397,13 +417,15 @@ function tool_devices_list(): array {
     $result = [];
     foreach (eqLogic::all() as $eq) {
         if ($eq->getIsEnable() != 1) continue;
+        $eq_cats = active_categories($eq->getCategory());
+        if (!empty($categories) && empty(array_intersect($categories, $eq_cats))) continue;
         $result[] = [
             'id'          => intval($eq->getId()),
             'name'        => $eq->getName() ?? '',
             'description' => $eq->getComment() ?: null,
             'object_id'   => $eq->getObject_id() ?: null,
             'object_name' => $object_map[$eq->getObject_id()] ?? null,
-            'category'    => $eq->getCategory() ?? '',
+            'categories'  => $eq_cats,
             'is_visible'  => $eq->getIsVisible() == 1,
         ];
     }
@@ -436,6 +458,7 @@ function tool_device_state(int $equipment_id): array {
         'equipment_id' => $equipment_id,
         'name'         => $eq->getName() ?? '',
         'description'  => $eq->getComment() ?: null,
+        'categories'   => active_categories($eq->getCategory()),
         'commands'     => $commands,
     ];
 }
@@ -450,7 +473,7 @@ function tool_device_set_description(int $equipment_id, string $description): ar
     return ['success' => true, 'equipment_id' => $equipment_id, 'description' => $description];
 }
 
-function tool_devices_states(?array $equipment_ids): array {
+function tool_devices_states(?array $equipment_ids, ?array $categories = null): array {
     $object_map = [];
     foreach (jeeObject::all() as $obj) {
         $object_map[$obj->getId()] = $obj->getName();
@@ -467,6 +490,8 @@ function tool_devices_states(?array $equipment_ids): array {
     foreach (eqLogic::all() as $eq) {
         if ($eq->getIsEnable() != 1) continue;
         if ($equipment_ids !== null && !in_array((int)$eq->getId(), $equipment_ids)) continue;
+        $eq_cats = active_categories($eq->getCategory());
+        if (!empty($categories) && empty(array_intersect($categories, $eq_cats))) continue;
 
         $cmds = $commands_by_eq[$eq->getId()] ?? [];
         $commands = [];
@@ -487,7 +512,7 @@ function tool_devices_states(?array $equipment_ids): array {
             'name'        => $eq->getName() ?? '',
             'description' => $eq->getComment() ?: null,
             'object_name' => $object_map[$eq->getObject_id()] ?? null,
-            'category'    => $eq->getCategory() ?? '',
+            'categories'  => $eq_cats,
             'is_visible'  => $eq->getIsVisible() == 1,
             'commands'    => $commands,
         ];
