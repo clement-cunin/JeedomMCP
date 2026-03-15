@@ -3,6 +3,74 @@ if (!isConnect('admin')) {
     throw new Exception('{{401 - Unauthorized access}}');
 }
 $mcpUrl = network::getNetworkAccess('external', 'proto:ip:port:comp') . '/plugins/JeedomMCP/api/mcp.php';
+
+// ACL matrix: domain => [op => has_tool]
+$acl_matrix = [
+    'devices'   => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => false, 'update' => false, 'delete' => false],
+    'rooms'     => ['read' => true, 'execution' => false, 'set_description' => true, 'create' => true, 'update' => true, 'delete' => true],
+    'scenarios' => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => true, 'update' => true, 'delete' => true],
+];
+
+// Default preset: "Read & Execute"
+$acl_defaults = [
+    'read' => '1', 'execution' => '1',
+    'set_description' => '0', 'create' => '0', 'update' => '0', 'delete' => '0',
+];
+
+// Initialize acl_mode default
+if (!in_array((string)config::byKey('acl_mode', 'JeedomMCP'), ['read_execute', 'read_execute_describe', 'full', 'custom'], true)) {
+    config::save('acl_mode', 'read_execute', 'JeedomMCP');
+}
+
+// Initialize custom per-op defaults (used when mode is custom)
+foreach ($acl_matrix as $domain => $ops) {
+    foreach ($ops as $op => $has_tool) {
+        if (!$has_tool) continue;
+        $key = "acl_{$domain}_{$op}";
+        $current = (string)config::byKey($key, 'JeedomMCP');
+        if (!in_array($current, ['0', '1'], true)) {
+            config::save($key, $acl_defaults[$op], 'JeedomMCP');
+        }
+    }
+}
+
+$acl_domain_labels = [
+    'devices'   => '{{Devices}}',
+    'rooms'     => '{{Rooms}}',
+    'scenarios' => '{{Scenarios}}',
+];
+$acl_op_labels = [
+    'read'            => '{{View / List}}',
+    'execution'       => '{{Run commands}}',
+    'set_description' => '{{Edit description}}',
+    'create'          => '{{Create}}',
+    'update'          => '{{Modify}}',
+    'delete'          => '{{Delete}}',
+];
+
+// Tool names displayed inside each cell
+$acl_tools = [
+    'devices' => [
+        'read'            => ['devices_list', 'device_state', 'devices_states'],
+        'execution'       => ['command_execute'],
+        'set_description' => ['device_set_description'],
+    ],
+    'rooms' => [
+        'read'            => ['rooms_list'],
+        'set_description' => ['room_set_description'],
+        'create'          => ['room_create'],
+        'update'          => ['room_update'],
+        'delete'          => ['room_delete'],
+    ],
+    'scenarios' => [
+        'read'            => ['scenarios_list', 'scenario_get_actions'],
+        'execution'       => ['scenario_run'],
+        'set_description' => ['scenario_set_description'],
+        'create'          => ['scenario_create'],
+        'update'          => ['scenario_update', 'scenario_set_actions'],
+        'delete'          => ['scenario_delete'],
+    ],
+];
 ?>
 
 <form class="form-horizontal">
@@ -42,11 +110,67 @@ $mcpUrl = network::getNetworkAccess('external', 'proto:ip:port:comp') . '/plugin
             </div>
         </div>
 
+        <legend><i class="fas fa-shield-alt"></i> {{Tool permissions}}</legend>
+
+        <div class="form-group">
+            <label class="col-sm-4 control-label">{{ACL mode}}</label>
+            <div class="col-sm-4">
+                <select id="acl_mode" class="configKey form-control" data-l1key="acl_mode">
+                    <option value="read_execute">{{Read &amp; Execute}}</option>
+                    <option value="read_execute_describe">{{Read, Execute &amp; Set description}}</option>
+                    <option value="full">{{Full access}}</option>
+                    <option value="custom">{{Custom}}</option>
+                </select>
+            </div>
+            <span class="help-block col-sm-4">{{In Custom mode, permissions are checked per operation using the table below.}}</span>
+        </div>
+
+        <div class="form-group">
+            <div id="acl_table_wrapper" class="col-sm-offset-4 col-sm-8">
+                <table class="table table-bordered table-condensed" style="width:auto">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <?php foreach ($acl_op_labels as $op_label): ?>
+                            <th class="text-center"><?php echo $op_label; ?></th>
+                            <?php endforeach; ?>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($acl_matrix as $domain => $ops): ?>
+                        <tr>
+                            <th style="vertical-align:top;padding-top:10px"><?php echo $acl_domain_labels[$domain]; ?></th>
+                            <?php foreach ($ops as $op => $has_tool): ?>
+                            <td class="text-center" style="">
+                                <?php if ($has_tool): ?>
+                                <input type="checkbox"
+                                       class="configKey acl-checkbox"
+                                       data-l1key="acl_<?php echo $domain; ?>_<?php echo $op; ?>"
+                                       data-op="<?php echo $op; ?>" />
+                                <?php foreach ($acl_tools[$domain][$op] as $tool_name): ?>
+                                <div><small class="text-muted"><?php echo $tool_name; ?></small></div>
+                                <?php endforeach; ?>
+                                <?php else: ?>
+                                <span class="text-muted">—</span>
+                                <?php endif; ?>
+                            </td>
+                            <?php endforeach; ?>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </fieldset>
 </form>
 
 <script>
 var mcpUrl = '<?php echo $mcpUrl; ?>';
+
+// ---------------------------------------------------------------------------
+// MCP JSON preview
+// ---------------------------------------------------------------------------
 
 function buildMcpJson() {
     var apikey = $('#inp_mcpApiKey').val() || '';
@@ -68,11 +192,12 @@ function updateMcpJsonPreview() {
 
 $('#inp_mcpApiKey').on('change', updateMcpJsonPreview);
 
-// Jeedom loads config values asynchronously after DOM ready — poll until populated
 var mcpJsonPollInterval = setInterval(function () {
     if ($('#inp_mcpApiKey').val()) {
         updateMcpJsonPreview();
         clearInterval(mcpJsonPollInterval);
+        // Config values are fully loaded — apply table state based on mode
+        applyAclMode($('#acl_mode').val());
     }
 }, 100);
 
@@ -112,5 +237,33 @@ $('#bt_copyApiKey').on('click', function () {
     navigator.clipboard.writeText(key).then(function () {
         $.fn.showAlert({ message: '{{API key copied to clipboard.}}', level: 'success' });
     });
+});
+
+// ---------------------------------------------------------------------------
+// ACL mode
+// ---------------------------------------------------------------------------
+
+var ACL_MODE_OPS = {
+    read_execute:          ['read', 'execution'],
+    read_execute_describe: ['read', 'execution', 'set_description'],
+    full:                  ['read', 'execution', 'set_description', 'create', 'update', 'delete']
+};
+
+function applyAclMode(mode) {
+    var isCustom = (mode === 'custom');
+    $('#acl_table_wrapper').css({
+        'opacity':        isCustom ? '1'    : '0.5',
+        'pointer-events': isCustom ? 'auto' : 'none'
+    });
+    if (!isCustom) {
+        var ops = ACL_MODE_OPS[mode] || [];
+        $('.acl-checkbox').each(function () {
+            $(this).prop('checked', ops.indexOf($(this).data('op')) !== -1);
+        });
+    }
+}
+
+$('#acl_mode').on('change', function () {
+    applyAclMode($(this).val());
 });
 </script>

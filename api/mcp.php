@@ -41,6 +41,26 @@ function tool_error(string $message): array {
     return ['content' => [['type' => 'text', 'text' => json_encode(['error' => $message])]], 'isError' => true];
 }
 
+function acl_check(string $domain, string $operation): void {
+    $mode = config::byKey('acl_mode', 'JeedomMCP', 'read_execute');
+    switch ($mode) {
+        case 'full':
+            return;
+        case 'read_execute_describe':
+            if (in_array($operation, ['read', 'execution', 'set_description'])) return;
+            break;
+        case 'custom':
+            $allowed = config::byKey("acl_{$domain}_{$operation}", 'JeedomMCP', '0');
+            if ($allowed == 1) return;
+            break;
+        case 'read_execute':
+        default:
+            if (in_array($operation, ['read', 'execution'])) return;
+            break;
+    }
+    throw new Exception("Operation '{$operation}' on '{$domain}' is not authorized");
+}
+
 // ---------------------------------------------------------------------------
 // Authentication
 // ---------------------------------------------------------------------------
@@ -255,6 +275,11 @@ function mcp_get_tools(): array {
             ],
         ],
         [
+            'name'        => 'acl_list',
+            'description' => 'Returns the current ACL mode and all authorized operations. Call this first to know which tools are available.',
+            'inputSchema' => ['type' => 'object', 'properties' => new stdClass(), 'required' => []],
+        ],
+        [
             'name'        => 'scenarios_list',
             'description' => 'List all Jeedom scenarios.',
             'inputSchema' => ['type' => 'object', 'properties' => new stdClass(), 'required' => []],
@@ -353,6 +378,7 @@ function mcp_get_tools(): array {
 function mcp_call_tool(string $name, array $args): array {
     try {
         switch ($name) {
+            case 'acl_list':            return tool_result(tool_acl_list());
             case 'devices_list':        return tool_result(tool_devices_list($args['categories'] ?? null));
             case 'device_state':        return tool_result(tool_device_state((int)($args['equipment_id'] ?? 0)));
             case 'device_set_description': return tool_result(tool_device_set_description((int)($args['equipment_id'] ?? 0), (string)($args['description'] ?? '')));
@@ -409,7 +435,56 @@ function active_categories($raw): array {
     return array_keys(array_filter($raw, function($v) { return $v == 1; }));
 }
 
+function tool_acl_list(): array {
+    $mode = config::byKey('acl_mode', 'JeedomMCP', 'read_execute');
+
+    $mode_ops = [
+        'read_execute'          => ['read', 'execution'],
+        'read_execute_describe' => ['read', 'execution', 'set_description'],
+        'full'                  => ['read', 'execution', 'set_description', 'create', 'update', 'delete'],
+    ];
+
+    // tool => [domain, operation]
+    $tool_map = [
+        'devices_list'           => ['devices',   'read'],
+        'device_state'           => ['devices',   'read'],
+        'devices_states'         => ['devices',   'read'],
+        'command_execute'        => ['devices',   'execution'],
+        'device_set_description' => ['devices',   'set_description'],
+        'rooms_list'             => ['rooms',     'read'],
+        'room_set_description'   => ['rooms',     'set_description'],
+        'room_create'            => ['rooms',     'create'],
+        'room_update'            => ['rooms',     'update'],
+        'room_delete'            => ['rooms',     'delete'],
+        'scenarios_list'         => ['scenarios', 'read'],
+        'scenario_get_actions'   => ['scenarios', 'read'],
+        'scenario_run'           => ['scenarios', 'execution'],
+        'scenario_set_description' => ['scenarios', 'set_description'],
+        'scenario_create'        => ['scenarios', 'create'],
+        'scenario_update'        => ['scenarios', 'update'],
+        'scenario_set_actions'   => ['scenarios', 'update'],
+        'scenario_delete'        => ['scenarios', 'delete'],
+    ];
+
+    $allowed_ops = $mode_ops[$mode] ?? ['read', 'execution'];
+
+    $authorized = ['acl_list']; // always accessible
+    foreach ($tool_map as $tool => $domain_op) {
+        $domain = $domain_op[0];
+        $op     = $domain_op[1];
+        if ($mode === 'custom') {
+            $ok = config::byKey("acl_{$domain}_{$op}", 'JeedomMCP', '0') == 1;
+        } else {
+            $ok = in_array($op, $allowed_ops);
+        }
+        if ($ok) $authorized[] = $tool;
+    }
+
+    return ['mode' => $mode, 'authorized_tools' => $authorized];
+}
+
 function tool_devices_list(?array $categories = null): array {
+    acl_check('devices', 'read');
     $object_map = [];
     foreach (jeeObject::all() as $obj) {
         $object_map[$obj->getId()] = $obj->getName();
@@ -434,6 +509,7 @@ function tool_devices_list(?array $categories = null): array {
 }
 
 function tool_device_state(int $equipment_id): array {
+    acl_check('devices', 'read');
     $eq = eqLogic::byId($equipment_id);
     if (!is_object($eq)) {
         return ['error' => "Equipment {$equipment_id} not found"];
@@ -476,6 +552,7 @@ function fmt_equipment(eqLogic $eq): array {
 }
 
 function tool_device_set_description(int $equipment_id, string $description): array {
+    acl_check('devices', 'set_description');
     $eq = eqLogic::byId($equipment_id);
     if (!is_object($eq)) throw new Exception("Equipment {$equipment_id} not found");
     $eq->setComment($description);
@@ -484,6 +561,7 @@ function tool_device_set_description(int $equipment_id, string $description): ar
 }
 
 function tool_devices_states(?array $equipment_ids, ?array $categories = null): array {
+    acl_check('devices', 'read');
     $object_map = [];
     foreach (jeeObject::all() as $obj) {
         $object_map[$obj->getId()] = $obj->getName();
@@ -542,6 +620,7 @@ function tool_devices_states(?array $equipment_ids, ?array $categories = null): 
 }
 
 function tool_command_execute(int $command_id, ?string $value): array {
+    acl_check('devices', 'execution');
     $cmd = cmd::byId($command_id);
     if (!is_object($cmd)) {
         return ['error' => "Command {$command_id} not found"];
@@ -572,6 +651,7 @@ function tool_command_execute(int $command_id, ?string $value): array {
 }
 
 function tool_rooms_list(): array {
+    acl_check('rooms', 'read');
     $result = [];
     foreach (jeeObject::all() as $obj) {
         $result[] = fmt_room($obj);
@@ -580,6 +660,7 @@ function tool_rooms_list(): array {
 }
 
 function tool_room_create(string $name, ?string $description, ?string $surface, ?int $orientation, ?int $parent_id): array {
+    acl_check('rooms', 'create');
     if ($parent_id !== null) {
         $parent = jeeObject::byId($parent_id);
         if (!is_object($parent)) throw new Exception("Parent room {$parent_id} not found");
@@ -598,6 +679,7 @@ function tool_room_create(string $name, ?string $description, ?string $surface, 
 }
 
 function tool_room_update(int $room_id, array $args): array {
+    acl_check('rooms', 'update');
     $obj = jeeObject::byId($room_id);
     if (!is_object($obj)) {
         return ['error' => "Room {$room_id} not found"];
@@ -625,6 +707,7 @@ function tool_room_update(int $room_id, array $args): array {
 }
 
 function tool_room_delete(int $room_id): array {
+    acl_check('rooms', 'delete');
     $obj = jeeObject::byId($room_id);
     if (!is_object($obj)) {
         return ['error' => "Room {$room_id} not found"];
@@ -652,6 +735,7 @@ function fmt_room(jeeObject $obj): array {
 }
 
 function tool_room_set_description(int $room_id, string $description): array {
+    acl_check('rooms', 'set_description');
     $obj = jeeObject::byId($room_id);
     if (!is_object($obj)) {
         return ['error' => "Room {$room_id} not found"];
@@ -662,6 +746,7 @@ function tool_room_set_description(int $room_id, string $description): array {
 }
 
 function tool_scenarios_list(): array {
+    acl_check('scenarios', 'read');
     $result = [];
     foreach (scenario::all() as $s) {
         $result[] = fmt_scenario($s);
@@ -670,6 +755,7 @@ function tool_scenarios_list(): array {
 }
 
 function tool_scenario_run(int $scenario_id): array {
+    acl_check('scenarios', 'execution');
     $s = scenario::byId($scenario_id);
     if (!is_object($s)) {
         return ['error' => "Scenario {$scenario_id} not found"];
@@ -679,6 +765,7 @@ function tool_scenario_run(int $scenario_id): array {
 }
 
 function tool_scenario_delete(int $scenario_id): array {
+    acl_check('scenarios', 'delete');
     $s = scenario::byId($scenario_id);
     if (!is_object($s)) {
         return ['error' => "Scenario {$scenario_id} not found"];
@@ -688,6 +775,7 @@ function tool_scenario_delete(int $scenario_id): array {
 }
 
 function tool_scenario_get_actions(int $scenario_id): array {
+    acl_check('scenarios', 'read');
     $s = scenario::byId($scenario_id);
     if (!is_object($s)) {
         return ['error' => "Scenario {$scenario_id} not found"];
@@ -700,6 +788,7 @@ function tool_scenario_get_actions(int $scenario_id): array {
 }
 
 function tool_scenario_set_actions(int $scenario_id, array $elements): array {
+    acl_check('scenarios', 'update');
     $s = scenario::byId($scenario_id);
     if (!is_object($s)) {
         return ['error' => "Scenario {$scenario_id} not found"];
@@ -714,6 +803,7 @@ function tool_scenario_set_actions(int $scenario_id, array $elements): array {
 }
 
 function tool_scenario_set_description(int $scenario_id, string $description): array {
+    acl_check('scenarios', 'set_description');
     $s = scenario::byId($scenario_id);
     if (!is_object($s)) {
         return ['error' => "Scenario {$scenario_id} not found"];
@@ -724,6 +814,7 @@ function tool_scenario_set_description(int $scenario_id, string $description): a
 }
 
 function tool_scenario_update(array $args): array {
+    acl_check('scenarios', 'update');
     $scenario_id = (int)($args['scenario_id'] ?? 0);
     $s = scenario::byId($scenario_id);
     if (!is_object($s)) {
@@ -740,6 +831,7 @@ function tool_scenario_update(array $args): array {
 }
 
 function tool_scenario_create(array $args): array {
+    acl_check('scenarios', 'create');
     $name = (string)($args['name'] ?? '');
     $mode = (string)($args['mode'] ?? '');
     if ($name === '' || $mode === '') {

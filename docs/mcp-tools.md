@@ -4,6 +4,38 @@ List of tools exposed by the JeedomMCP server.
 
 ---
 
+## `acl_list`
+
+Returns the current ACL mode and all authorized operations. Call this first to know which tools are available before attempting write operations.
+
+**Parameters**: none
+
+**Returns**:
+
+```json
+{
+  "mode": "read_execute",
+  "authorized_tools": [
+    "acl_list",
+    "devices_list",
+    "device_state",
+    "devices_states",
+    "command_execute",
+    "rooms_list",
+    "scenarios_list",
+    "scenario_get_actions",
+    "scenario_run"
+  ]
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `mode` | Active ACL mode: `read_execute`, `read_execute_describe`, `full`, or `custom` |
+| `authorized_tools` | List of tool names the client is currently allowed to call. `acl_list` is always included. |
+
+---
+
 ## `devices_list`
 
 Lists all enabled Jeedom equipment.
