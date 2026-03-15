@@ -243,12 +243,24 @@ $('#bt_copyApiKey').on('click', function () {
 // ACL mode
 // ---------------------------------------------------------------------------
 
+var ACL_MODE_OPS = {
+    read_execute:          ['read', 'execution'],
+    read_execute_describe: ['read', 'execution', 'set_description'],
+    full:                  ['read', 'execution', 'set_description', 'create', 'update', 'delete']
+};
+
 function applyAclMode(mode) {
     var isCustom = (mode === 'custom');
     $('#acl_table_wrapper').css({
-        'opacity':         isCustom ? '1'    : '0.5',
-        'pointer-events':  isCustom ? 'auto' : 'none'
+        'opacity':        isCustom ? '1'    : '0.5',
+        'pointer-events': isCustom ? 'auto' : 'none'
     });
+    if (!isCustom) {
+        var ops = ACL_MODE_OPS[mode] || [];
+        $('.acl-checkbox').each(function () {
+            $(this).prop('checked', ops.indexOf($(this).data('op')) !== -1);
+        });
+    }
 }
 
 $('#acl_mode').on('change', function () {
