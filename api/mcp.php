@@ -580,6 +580,10 @@ function tool_rooms_list(): array {
 }
 
 function tool_room_create(string $name, ?string $description, ?string $surface, ?int $orientation, ?int $parent_id): array {
+    if ($parent_id !== null) {
+        $parent = jeeObject::byId($parent_id);
+        if (!is_object($parent)) throw new Exception("Parent room {$parent_id} not found");
+    }
     $obj = new jeeObject();
     $obj->setName($name);
     if ($description !== null) $obj->setConfiguration('description', $description);
@@ -605,7 +609,12 @@ function tool_room_update(int $room_id, array $args): array {
         $obj->setConfiguration('info::orientation', $args['orientation'] === null ? '' : (string)$args['orientation']);
     }
     if (array_key_exists('parent_id', $args)) {
-        $obj->setFather_id($args['parent_id'] === 0 ? null : $args['parent_id']);
+        $new_parent_id = (int)$args['parent_id'];
+        if ($new_parent_id !== 0) {
+            $parent = jeeObject::byId($new_parent_id);
+            if (!is_object($parent)) throw new Exception("Parent room {$new_parent_id} not found");
+        }
+        $obj->setFather_id($new_parent_id === 0 ? null : $new_parent_id);
     }
     if (array_key_exists('icon', $args)) {
         $icon_html = ($args['icon'] === '' || $args['icon'] === null) ? '' : '<i class="' . $args['icon'] . '"></i>';
