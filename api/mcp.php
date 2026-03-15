@@ -388,6 +388,11 @@ function fmt_scenario(object $s): array {
     ];
 }
 
+function active_categories(mixed $raw): array {
+    if (!is_array($raw)) return [];
+    return array_keys(array_filter($raw, fn($v) => $v == 1));
+}
+
 function tool_devices_list(): array {
     $object_map = [];
     foreach (jeeObject::all() as $obj) {
@@ -403,7 +408,7 @@ function tool_devices_list(): array {
             'description' => $eq->getComment() ?: null,
             'object_id'   => $eq->getObject_id() ?: null,
             'object_name' => $object_map[$eq->getObject_id()] ?? null,
-            'category'    => $eq->getCategory() ?? '',
+            'categories'  => active_categories($eq->getCategory()),
             'is_visible'  => $eq->getIsVisible() == 1,
         ];
     }
@@ -487,7 +492,7 @@ function tool_devices_states(?array $equipment_ids): array {
             'name'        => $eq->getName() ?? '',
             'description' => $eq->getComment() ?: null,
             'object_name' => $object_map[$eq->getObject_id()] ?? null,
-            'category'    => $eq->getCategory() ?? '',
+            'categories'  => active_categories($eq->getCategory()),
             'is_visible'  => $eq->getIsVisible() == 1,
             'commands'    => $commands,
         ];
