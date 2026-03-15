@@ -136,7 +136,7 @@ $acl_tools = [
                         <tr>
                             <th style="vertical-align:top;padding-top:10px"><?php echo $acl_domain_labels[$domain]; ?></th>
                             <?php foreach ($ops as $op => $has_tool): ?>
-                            <td class="text-center" style="<?php echo $has_tool ? '' : 'background:#f5f5f5;'; ?>">
+                            <td class="text-center" style="">
                                 <?php if ($has_tool): ?>
                                 <input type="checkbox"
                                        class="configKey acl-checkbox"
