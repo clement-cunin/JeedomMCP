@@ -53,10 +53,11 @@ case 'my_tool': return tool_result(tool_my_tool((int)($args['my_id'] ?? 0)));
 
 Cast parameters at the dispatch level, not inside the implementation.
 
-### 3. Implement the function
+### 3. Add `acl_check()` at the top of the function
 
 ```php
 function tool_my_tool(int $id): array {
+    acl_check('domain', 'operation');  // e.g. acl_check('rooms', 'create')
     $obj = SomeClass::byId($id);
     if (!is_object($obj)) throw new Exception("Object {$id} not found");
     // ...
@@ -64,7 +65,21 @@ function tool_my_tool(int $id): array {
 }
 ```
 
-### 4. Document in `docs/mcp-tools.md`
+Pick the domain (`devices`, `rooms`, `scenarios`) and the operation (`read`, `execution`, `set_description`, `create`, `update`, `delete`) that best describes the tool. `acl_check` throws if the operation is blocked — the dispatcher catches it and returns a tool error.
+
+### 4. Register the tool in `acl_list`
+
+Add an entry to `$tool_map` in `tool_acl_list()` so the new tool appears in the authorized tools list:
+
+```php
+'my_tool' => ['domain', 'operation'],
+```
+
+### 5. Document in `docs/mcp-tools.md`
+
+Add a section following the existing format: description, parameters table, return example.
+
+### 6. Document in `docs/mcp-tools.md`
 
 Add a section following the existing format: description, parameters table, return example.
 
@@ -149,9 +164,47 @@ if (!isset($args['name'])) $args['name'] = $s->getName();
 
 ---
 
+## ACL system
+
+### How it works
+
+Every tool implementation calls `acl_check(domain, operation)` as its first line. The check reads `acl_mode` from config and either approves or throws:
+
+| Mode | Authorized operations |
+|------|-----------------------|
+| `read_execute` (default) | `read`, `execution` |
+| `read_execute_describe` | `read`, `execution`, `set_description` |
+| `full` | all operations |
+| `custom` | per-key config — `acl_{domain}_{operation}`, default `'0'` (blocked) |
+
+```php
+function acl_check(string $domain, string $operation): void { ... }
+```
+
+### Default behavior for new tools
+
+- **`acl_mode` default**: `read_execute` — new write tools are blocked until the admin explicitly changes the mode.
+- **Custom mode default**: individual keys default to `'0'` (blocked) if never set.
+
+This means a newly deployed tool is only accessible if its operation (`read` or `execution`) is covered by the current mode.
+
+### Domains and operations
+
+| Domain | Operations with tools |
+|--------|-----------------------|
+| `devices` | `read`, `execution`, `set_description` |
+| `rooms` | `read`, `set_description`, `create`, `update`, `delete` |
+| `scenarios` | `read`, `execution`, `set_description`, `create`, `update`, `delete` |
+
+### `acl_list` tool
+
+`acl_list` is a special tool with no `acl_check` — always accessible. It returns the current mode and the flat list of authorized tool names. When adding a new tool, register it in `$tool_map` inside `tool_acl_list()`.
+
+---
+
 ## Commit conventions
 
 - `feat:` new tool or capability
 - `fix:` bug fix
 - `docs:` documentation only
-- Tool changes and their `docs/mcp-tools.md` update must be in the **same commit**
+- Tool changes, their `docs/mcp-tools.md` update, and `acl_list` registration must be in the **same commit**
