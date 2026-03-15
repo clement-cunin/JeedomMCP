@@ -99,27 +99,22 @@ $acl_op_labels = [
         <div class="form-group">
             <div class="col-sm-offset-1 col-sm-11">
                 <table class="table table-bordered table-condensed" style="width:auto">
-                    <thead>
-                        <tr>
-                            <th></th>
-                            <?php foreach ($acl_op_labels as $op_label): ?>
-                            <th class="text-center" style="min-width:90px"><?php echo $op_label; ?></th>
-                            <?php endforeach; ?>
-                        </tr>
-                    </thead>
                     <tbody>
                         <?php foreach ($acl_matrix as $domain => $ops): ?>
                         <tr>
                             <th style="vertical-align:middle"><?php echo $acl_domain_labels[$domain]; ?></th>
                             <?php foreach ($ops as $op => $has_tool): ?>
-                            <td class="text-center" style="vertical-align:middle;<?php echo $has_tool ? '' : 'background:#f5f5f5;'; ?>">
+                            <td style="vertical-align:middle;<?php echo $has_tool ? '' : 'background:#f5f5f5;'; ?>">
                                 <?php if ($has_tool): ?>
-                                <input type="checkbox"
-                                       class="configKey acl-checkbox"
-                                       data-l1key="acl_<?php echo $domain; ?>_<?php echo $op; ?>"
-                                       data-op="<?php echo $op; ?>" />
+                                <label style="font-weight:normal;white-space:nowrap;margin:0">
+                                    <input type="checkbox"
+                                           class="configKey acl-checkbox"
+                                           data-l1key="acl_<?php echo $domain; ?>_<?php echo $op; ?>"
+                                           data-op="<?php echo $op; ?>" />
+                                    <?php echo $acl_op_labels[$op]; ?>
+                                </label>
                                 <?php else: ?>
-                                <span class="text-muted">—</span>
+                                <span class="text-muted" style="white-space:nowrap">— <?php echo $acl_op_labels[$op]; ?></span>
                                 <?php endif; ?>
                             </td>
                             <?php endforeach; ?>
