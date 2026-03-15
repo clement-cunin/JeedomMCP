@@ -441,6 +441,7 @@ function tool_device_state(int $equipment_id): array {
         'equipment_id' => $equipment_id,
         'name'         => $eq->getName() ?? '',
         'description'  => $eq->getComment() ?: null,
+        'categories'   => active_categories($eq->getCategory()),
         'commands'     => $commands,
     ];
 }
