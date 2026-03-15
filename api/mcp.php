@@ -574,7 +574,7 @@ function tool_rooms_list(): array {
             'description' => $obj->getConfiguration('description') ?: null,
             'surface'     => $obj->getConfiguration('info::space') ?: null,
             'orientation' => ($orientation_raw !== '' && $orientation_raw !== null) ? intval($orientation_raw) : null,
-            'parent_id'   => $obj->getFather_id() ?: null,
+            'parent_id'   => $obj->getFather_id() ? intval($obj->getFather_id()) : null,
         ];
     }
     return $result;
@@ -629,7 +629,7 @@ function fmt_room(jeeObject $obj): array {
         'description' => $obj->getConfiguration('description') ?: null,
         'surface'     => $obj->getConfiguration('info::space') ?: null,
         'orientation' => ($orientation_raw !== '' && $orientation_raw !== null) ? intval($orientation_raw) : null,
-        'parent_id'   => $obj->getFather_id() ?: null,
+        'parent_id'   => $obj->getFather_id() ? intval($obj->getFather_id()) : null,
     ];
 }
 
