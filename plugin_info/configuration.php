@@ -35,11 +35,11 @@ $acl_domain_labels = [
     'scenarios' => '{{Scenarios}}',
 ];
 $acl_op_labels = [
-    'read'            => '{{Read}}',
-    'execution'       => '{{Execute}}',
-    'set_description' => '{{Set description}}',
+    'read'            => '{{View / List}}',
+    'execution'       => '{{Run commands}}',
+    'set_description' => '{{Edit description}}',
     'create'          => '{{Create}}',
-    'update'          => '{{Update}}',
+    'update'          => '{{Modify}}',
     'delete'          => '{{Delete}}',
 ];
 ?>
