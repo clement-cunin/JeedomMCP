@@ -121,7 +121,7 @@ $acl_tools = [
         </div>
 
         <div class="form-group">
-            <div class="col-sm-offset-1 col-sm-11">
+            <div class="col-sm-offset-4 col-sm-8">
                 <table class="table table-bordered table-condensed" style="width:auto">
                     <thead>
                         <tr>
