@@ -42,10 +42,23 @@ function tool_error(string $message): array {
 }
 
 function acl_check(string $domain, string $operation): void {
-    $allowed = config::byKey("acl_{$domain}_{$operation}", 'JeedomMCP', '1');
-    if ($allowed != 1) {
-        throw new Exception("Operation '{$operation}' on '{$domain}' is not authorized");
+    $mode = config::byKey('acl_mode', 'JeedomMCP', 'read_execute');
+    switch ($mode) {
+        case 'full':
+            return;
+        case 'read_execute_describe':
+            if (in_array($operation, ['read', 'execution', 'set_description'])) return;
+            break;
+        case 'custom':
+            $allowed = config::byKey("acl_{$domain}_{$operation}", 'JeedomMCP', '0');
+            if ($allowed == 1) return;
+            break;
+        case 'read_execute':
+        default:
+            if (in_array($operation, ['read', 'execution'])) return;
+            break;
     }
+    throw new Exception("Operation '{$operation}' on '{$domain}' is not authorized");
 }
 
 // ---------------------------------------------------------------------------

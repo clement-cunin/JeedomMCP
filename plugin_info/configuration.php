@@ -17,7 +17,12 @@ $acl_defaults = [
     'set_description' => '0', 'create' => '0', 'update' => '0', 'delete' => '0',
 ];
 
-// Initialize config values on first load (robust check: only skip if already '0' or '1')
+// Initialize acl_mode default
+if (!in_array((string)config::byKey('acl_mode', 'JeedomMCP'), ['read_execute', 'read_execute_describe', 'full', 'custom'], true)) {
+    config::save('acl_mode', 'read_execute', 'JeedomMCP');
+}
+
+// Initialize custom per-op defaults (used when mode is custom)
 foreach ($acl_matrix as $domain => $ops) {
     foreach ($ops as $op => $has_tool) {
         if (!$has_tool) continue;
@@ -108,20 +113,20 @@ $acl_tools = [
         <legend><i class="fas fa-shield-alt"></i> {{Tool permissions}}</legend>
 
         <div class="form-group">
-            <label class="col-sm-4 control-label">{{Preset}}</label>
+            <label class="col-sm-4 control-label">{{ACL mode}}</label>
             <div class="col-sm-4">
-                <select id="acl_preset" class="form-control">
+                <select id="acl_mode" class="configKey form-control" data-l1key="acl_mode">
                     <option value="read_execute">{{Read &amp; Execute}}</option>
                     <option value="read_execute_describe">{{Read, Execute &amp; Set description}}</option>
                     <option value="full">{{Full access}}</option>
                     <option value="custom">{{Custom}}</option>
                 </select>
             </div>
-            <span class="help-block col-sm-4">{{Quick preset — applies to all domains at once.}}</span>
+            <span class="help-block col-sm-4">{{In Custom mode, permissions are checked per operation using the table below.}}</span>
         </div>
 
         <div class="form-group">
-            <div class="col-sm-offset-4 col-sm-8">
+            <div id="acl_table_wrapper" class="col-sm-offset-4 col-sm-8">
                 <table class="table table-bordered table-condensed" style="width:auto">
                     <thead>
                         <tr>
@@ -191,8 +196,8 @@ var mcpJsonPollInterval = setInterval(function () {
     if ($('#inp_mcpApiKey').val()) {
         updateMcpJsonPreview();
         clearInterval(mcpJsonPollInterval);
-        // Config values are loaded — sync the preset selector
-        detectAclPreset();
+        // Config values are fully loaded — apply table state based on mode
+        applyAclMode($('#acl_mode').val());
     }
 }, 100);
 
@@ -235,49 +240,18 @@ $('#bt_copyApiKey').on('click', function () {
 });
 
 // ---------------------------------------------------------------------------
-// ACL preset selector
+// ACL mode
 // ---------------------------------------------------------------------------
 
-var ACL_PRESETS = {
-    read_execute:          ['read', 'execution'],
-    read_execute_describe: ['read', 'execution', 'set_description'],
-    full:                  ['read', 'execution', 'set_description', 'create', 'update', 'delete']
-};
-
-function applyAclPreset(presetKey) {
-    var ops = ACL_PRESETS[presetKey];
-    if (!ops) return;
-    $('.acl-checkbox').each(function () {
-        $(this).prop('checked', ops.indexOf($(this).data('op')) !== -1);
+function applyAclMode(mode) {
+    var isCustom = (mode === 'custom');
+    $('#acl_table_wrapper').css({
+        'opacity':         isCustom ? '1'    : '0.5',
+        'pointer-events':  isCustom ? 'auto' : 'none'
     });
 }
 
-function detectAclPreset() {
-    for (var presetKey in ACL_PRESETS) {
-        var ops = ACL_PRESETS[presetKey];
-        var matches = true;
-        $('.acl-checkbox').each(function () {
-            if ($(this).prop('checked') !== (ops.indexOf($(this).data('op')) !== -1)) {
-                matches = false;
-                return false;
-            }
-        });
-        if (matches) {
-            $('#acl_preset').val(presetKey);
-            return;
-        }
-    }
-    $('#acl_preset').val('custom');
-}
-
-$('#acl_preset').on('change', function () {
-    var val = $(this).val();
-    if (val !== 'custom') {
-        applyAclPreset(val);
-    }
-});
-
-$('.acl-checkbox').on('change', function () {
-    detectAclPreset();
+$('#acl_mode').on('change', function () {
+    applyAclMode($(this).val());
 });
 </script>
