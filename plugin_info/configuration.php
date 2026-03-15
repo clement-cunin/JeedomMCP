@@ -3,6 +3,38 @@ if (!isConnect('admin')) {
     throw new Exception('{{401 - Unauthorized access}}');
 }
 $mcpUrl = network::getNetworkAccess('external', 'proto:ip:port:comp') . '/plugins/JeedomMCP/api/mcp.php';
+
+// ACL matrix definition: domain => [op => has_tool]
+$acl_matrix = [
+    'devices'   => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => false, 'update' => false, 'delete' => false],
+    'rooms'     => ['read' => true, 'execution' => false, 'set_description' => true, 'create' => true, 'update' => true, 'delete' => true],
+    'scenarios' => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => true, 'update' => true, 'delete' => true],
+];
+
+// Initialize defaults to '1' (enabled) for cells that have a tool and were never explicitly configured
+foreach ($acl_matrix as $domain => $ops) {
+    foreach ($ops as $op => $has_tool) {
+        if (!$has_tool) continue;
+        $key = "acl_{$domain}_{$op}";
+        if (config::byKey($key, 'JeedomMCP', null) === null) {
+            config::save($key, '1', 'JeedomMCP');
+        }
+    }
+}
+
+$acl_domain_labels = [
+    'devices'   => '{{Devices}}',
+    'rooms'     => '{{Rooms}}',
+    'scenarios' => '{{Scenarios}}',
+];
+$acl_op_labels = [
+    'read'            => '{{Read}}',
+    'execution'       => '{{Execute}}',
+    'set_description' => '{{Set description}}',
+    'create'          => '{{Create}}',
+    'update'          => '{{Update}}',
+    'delete'          => '{{Delete}}',
+];
 ?>
 
 <form class="form-horizontal">
@@ -39,6 +71,40 @@ $mcpUrl = network::getNetworkAccess('external', 'proto:ip:port:comp') . '/plugin
                         </button>
                     </span>
                 </div>
+            </div>
+        </div>
+
+        <legend><i class="fas fa-shield-alt"></i> {{Tool permissions}}</legend>
+
+        <div class="form-group">
+            <div class="col-sm-offset-1 col-sm-11">
+                <p class="help-block">{{Select which operations the LLM is authorized to perform. Uncheck an operation to block it — the tool will return an error if called. All operations are enabled by default.}}</p>
+                <table class="table table-bordered table-condensed" style="width:auto">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <?php foreach ($acl_op_labels as $op_label): ?>
+                            <th class="text-center" style="min-width:90px"><?php echo $op_label; ?></th>
+                            <?php endforeach; ?>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($acl_matrix as $domain => $ops): ?>
+                        <tr>
+                            <th style="vertical-align:middle"><?php echo $acl_domain_labels[$domain]; ?></th>
+                            <?php foreach ($ops as $op => $has_tool): ?>
+                            <td class="text-center" style="vertical-align:middle;<?php echo $has_tool ? '' : 'background:#f5f5f5;'; ?>">
+                                <?php if ($has_tool): ?>
+                                <input type="checkbox" class="configKey" data-l1key="acl_<?php echo $domain; ?>_<?php echo $op; ?>" />
+                                <?php else: ?>
+                                <span class="text-muted">—</span>
+                                <?php endif; ?>
+                            </td>
+                            <?php endforeach; ?>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
 
