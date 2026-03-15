@@ -235,6 +235,7 @@ function mcp_get_tools(): array {
                     'room_id'     => ['type' => 'integer', 'description' => 'Room ID obtained from rooms_list.'],
                     'name'        => ['type' => 'string',  'description' => 'New display name.'],
                     'description' => ['type' => 'string',  'description' => 'New description.'],
+                    'icon'        => ['type' => 'string',  'description' => 'CSS icon class (e.g. "icon maison-wc" or "fas fa-home"). Pass empty string to clear.'],
                     'surface'     => ['type' => 'string',  'description' => 'Floor area in square metres.'],
                     'orientation' => ['type' => 'integer', 'description' => 'Orientation in degrees: 0=N, 45=NE, 90=E, 135=SE, 180=S, 225=SW, 270=W, 315=NW. Pass null to clear.'],
                     'parent_id'   => ['type' => 'integer', 'description' => 'Parent room ID. Pass 0 to move to top-level.'],
@@ -572,6 +573,7 @@ function tool_rooms_list(): array {
             'id'          => intval($obj->getId()),
             'name'        => $obj->getName() ?? '',
             'description' => $obj->getConfiguration('description') ?: null,
+            'icon'        => extract_icon($obj->getDisplay('icon') ?? ''),
             'surface'     => $obj->getConfiguration('info::space') ?: null,
             'orientation' => ($orientation_raw !== '' && $orientation_raw !== null) ? intval($orientation_raw) : null,
             'parent_id'   => $obj->getFather_id() ? intval($obj->getFather_id()) : null,
@@ -608,6 +610,10 @@ function tool_room_update(int $room_id, array $args): array {
     if (array_key_exists('parent_id', $args)) {
         $obj->setFather_id($args['parent_id'] === 0 ? null : $args['parent_id']);
     }
+    if (array_key_exists('icon', $args)) {
+        $icon_html = ($args['icon'] === '' || $args['icon'] === null) ? '' : '<i class="' . $args['icon'] . '"></i>';
+        $obj->setDisplay('icon', $icon_html);
+    }
     $obj->save();
     return fmt_room($obj);
 }
@@ -621,12 +627,18 @@ function tool_room_delete(int $room_id): array {
     return ['success' => true, 'room_id' => $room_id];
 }
 
+function extract_icon(string $html): ?string {
+    if (preg_match('/<i\s+class="([^"]+)"\s*><\/i>/', $html, $m)) return $m[1];
+    return null;
+}
+
 function fmt_room(jeeObject $obj): array {
     $orientation_raw = $obj->getConfiguration('info::orientation');
     return [
         'id'          => intval($obj->getId()),
         'name'        => $obj->getName() ?? '',
         'description' => $obj->getConfiguration('description') ?: null,
+        'icon'        => extract_icon($obj->getDisplay('icon') ?? ''),
         'surface'     => $obj->getConfiguration('info::space') ?: null,
         'orientation' => ($orientation_raw !== '' && $orientation_raw !== null) ? intval($orientation_raw) : null,
         'parent_id'   => $obj->getFather_id() ? intval($obj->getFather_id()) : null,
