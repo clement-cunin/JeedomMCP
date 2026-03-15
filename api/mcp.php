@@ -486,6 +486,17 @@ function tool_devices_states(?array $equipment_ids, ?array $categories = null): 
         $commands_by_eq[$eq_id][] = $cmd;
     }
 
+    if (!empty($equipment_ids)) {
+        $found = [];
+        foreach (eqLogic::all() as $eq) {
+            if (in_array((int)$eq->getId(), $equipment_ids)) $found[] = (int)$eq->getId();
+        }
+        $missing = array_diff($equipment_ids, $found);
+        if (!empty($missing)) {
+            throw new Exception('Equipment not found: ' . implode(', ', $missing));
+        }
+    }
+
     $result = [];
     foreach (eqLogic::all() as $eq) {
         if ($eq->getIsEnable() != 1) continue;
