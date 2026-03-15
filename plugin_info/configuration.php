@@ -42,6 +42,30 @@ $acl_op_labels = [
     'update'          => '{{Modify}}',
     'delete'          => '{{Delete}}',
 ];
+
+// Tool names displayed inside each cell
+$acl_tools = [
+    'devices' => [
+        'read'            => ['devices_list', 'device_state', 'devices_states'],
+        'execution'       => ['command_execute'],
+        'set_description' => ['device_set_description'],
+    ],
+    'rooms' => [
+        'read'            => ['rooms_list'],
+        'set_description' => ['room_set_description'],
+        'create'          => ['room_create'],
+        'update'          => ['room_update'],
+        'delete'          => ['room_delete'],
+    ],
+    'scenarios' => [
+        'read'            => ['scenarios_list', 'scenario_get_actions'],
+        'execution'       => ['scenario_run'],
+        'set_description' => ['scenario_set_description'],
+        'create'          => ['scenario_create'],
+        'update'          => ['scenario_update', 'scenario_set_actions'],
+        'delete'          => ['scenario_delete'],
+    ],
+];
 ?>
 
 <form class="form-horizontal">
@@ -99,22 +123,30 @@ $acl_op_labels = [
         <div class="form-group">
             <div class="col-sm-offset-1 col-sm-11">
                 <table class="table table-bordered table-condensed" style="width:auto">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <?php foreach ($acl_op_labels as $op_label): ?>
+                            <th class="text-center"><?php echo $op_label; ?></th>
+                            <?php endforeach; ?>
+                        </tr>
+                    </thead>
                     <tbody>
                         <?php foreach ($acl_matrix as $domain => $ops): ?>
                         <tr>
-                            <th style="vertical-align:middle"><?php echo $acl_domain_labels[$domain]; ?></th>
+                            <th style="vertical-align:top;padding-top:10px"><?php echo $acl_domain_labels[$domain]; ?></th>
                             <?php foreach ($ops as $op => $has_tool): ?>
-                            <td style="vertical-align:middle;<?php echo $has_tool ? '' : 'background:#f5f5f5;'; ?>">
+                            <td class="text-center" style="<?php echo $has_tool ? '' : 'background:#f5f5f5;'; ?>">
                                 <?php if ($has_tool): ?>
-                                <label style="font-weight:normal;white-space:nowrap;margin:0">
-                                    <input type="checkbox"
-                                           class="configKey acl-checkbox"
-                                           data-l1key="acl_<?php echo $domain; ?>_<?php echo $op; ?>"
-                                           data-op="<?php echo $op; ?>" />
-                                    <?php echo $acl_op_labels[$op]; ?>
-                                </label>
+                                <input type="checkbox"
+                                       class="configKey acl-checkbox"
+                                       data-l1key="acl_<?php echo $domain; ?>_<?php echo $op; ?>"
+                                       data-op="<?php echo $op; ?>" />
+                                <?php foreach ($acl_tools[$domain][$op] as $tool_name): ?>
+                                <div><small class="text-muted"><?php echo $tool_name; ?></small></div>
+                                <?php endforeach; ?>
                                 <?php else: ?>
-                                <span class="text-muted" style="white-space:nowrap">— <?php echo $acl_op_labels[$op]; ?></span>
+                                <span class="text-muted">—</span>
                                 <?php endif; ?>
                             </td>
                             <?php endforeach; ?>
