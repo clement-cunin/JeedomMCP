@@ -244,3 +244,4 @@ This means a newly deployed tool is only accessible if its operation (`read` or 
 - `fix:` bug fix
 - `docs:` documentation only
 - Tool changes, their `docs/mcp-tools.md` update, and `acl_list` registration must be in the **same commit**
+- **Every commit that changes user-visible behaviour must update `CHANGELOG.md`** — add a bullet under `## [Unreleased]`
