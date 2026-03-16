@@ -238,6 +238,25 @@ This means a newly deployed tool is only accessible if its operation (`read` or 
 
 ---
 
+## i18n
+
+Translation files are at `core/i18n/fr_FR.json` and `core/i18n/en_US.json`. Jeedom requires a **nested format keyed by file path** — a flat map does not work:
+
+```json
+{
+    "plugins\/JeedomMCP\/plugin_info\/configuration.php": {
+        "My label": "Mon libellé"
+    },
+    "plugins\/JeedomMCP\/desktop\/php\/JeedomMCP.php": {
+        "My other label": "Mon autre libellé"
+    }
+}
+```
+
+When adding a new `{{...}}` string to a PHP file, add the corresponding entry under the correct file path key in both `fr_FR.json` and `en_US.json` in the same commit.
+
+---
+
 ## Commit conventions
 
 - `feat:` new tool or capability
