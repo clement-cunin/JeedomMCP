@@ -112,7 +112,7 @@ switch ($rpc_method) {
             'instructions'    => (
                 'Control a Jeedom home automation system. ' .
                 'Use devices_list to discover available equipment, ' .
-                'device_state to read current values, ' .
+                'devices_states to refresh current values, ' .
                 'command_execute to trigger actions, ' .
                 'and scenarios_list / scenario_run for automation scenarios.'
             ),
@@ -148,28 +148,21 @@ function mcp_get_tools(): array {
     return [
         [
             'name'        => 'devices_list',
-            'description' => 'List all enabled Jeedom equipment. Returns a paginated response.',
+            'description' => 'List all enabled Jeedom equipment with their current state and available actions. Use include_state=false or include_actions=false to reduce response size when only metadata is needed.',
             'inputSchema' => [
                 'type'       => 'object',
                 'properties' => [
-                    'categories' => [
+                    'categories'      => [
                         'type'        => 'array',
                         'items'       => ['type' => 'string', 'enum' => ['heating', 'security', 'energy', 'light', 'opening', 'automatism', 'multimedia', 'default']],
                         'description' => 'Filter by category — returns equipment matching at least one.',
                     ],
-                    'limit'  => ['type' => 'integer', 'description' => 'Maximum number of items to return (default 50). Use 0 for no limit.'],
-                    'offset' => ['type' => 'integer', 'description' => 'Number of items to skip (default 0).'],
+                    'include_state'   => ['type' => 'boolean', 'description' => 'Include the state map for each device (default true).'],
+                    'include_actions' => ['type' => 'boolean', 'description' => 'Include the actions array for each device (default true).'],
+                    'limit'           => ['type' => 'integer', 'description' => 'Maximum number of items to return (default 50). Use 0 for no limit.'],
+                    'offset'          => ['type' => 'integer', 'description' => 'Number of items to skip (default 0).'],
                 ],
                 'required' => [],
-            ],
-        ],
-        [
-            'name'        => 'device_state',
-            'description' => 'Get the current state of an equipment and all its commands.',
-            'inputSchema' => [
-                'type'       => 'object',
-                'properties' => ['equipment_id' => ['type' => 'integer', 'description' => 'Equipment ID obtained from devices_list.']],
-                'required'   => ['equipment_id'],
             ],
         ],
         [
@@ -186,24 +179,17 @@ function mcp_get_tools(): array {
         ],
         [
             'name'        => 'devices_states',
-            'description' => 'Get the current state of all equipment and their commands in a single call. Returns a paginated response.',
+            'description' => 'Bulk refresh the state of a specific set of equipment. Returns only {id, state} per device — use devices_list for full discovery.',
             'inputSchema' => [
                 'type'       => 'object',
                 'properties' => [
                     'equipment_ids' => [
                         'type'        => 'array',
                         'items'       => ['type' => 'integer'],
-                        'description' => 'Optional list of equipment IDs to filter. If omitted, returns all enabled equipment.',
+                        'description' => 'List of equipment IDs to refresh.',
                     ],
-                    'categories' => [
-                        'type'        => 'array',
-                        'items'       => ['type' => 'string', 'enum' => ['heating', 'security', 'energy', 'light', 'opening', 'automatism', 'multimedia', 'default']],
-                        'description' => 'Filter by category — returns equipment matching at least one.',
-                    ],
-                    'limit'  => ['type' => 'integer', 'description' => 'Maximum number of items to return (default 50). Use 0 for no limit.'],
-                    'offset' => ['type' => 'integer', 'description' => 'Number of items to skip (default 0).'],
                 ],
-                'required' => [],
+                'required' => ['equipment_ids'],
             ],
         ],
         [
@@ -212,7 +198,7 @@ function mcp_get_tools(): array {
             'inputSchema' => [
                 'type'       => 'object',
                 'properties' => [
-                    'command_id' => ['type' => 'integer', 'description' => 'Command ID obtained from device_state.'],
+                    'command_id' => ['type' => 'integer', 'description' => 'Command ID obtained from devices_list actions.'],
                     'value'      => ['type' => 'string',  'description' => 'Optional value for slider or text commands.'],
                 ],
                 'required' => ['command_id'],
@@ -397,10 +383,9 @@ function mcp_call_tool(string $name, array $args): array {
     try {
         switch ($name) {
             case 'acl_list':            return tool_result(tool_acl_list());
-            case 'devices_list':        return tool_result(tool_devices_list($args['categories'] ?? null, intval($args['limit'] ?? 50), intval($args['offset'] ?? 0)));
-            case 'device_state':        return tool_result(tool_device_state((int)($args['equipment_id'] ?? 0)));
+            case 'devices_list':        return tool_result(tool_devices_list($args['categories'] ?? null, intval($args['limit'] ?? 50), intval($args['offset'] ?? 0), isset($args['include_state']) ? (bool)$args['include_state'] : true, isset($args['include_actions']) ? (bool)$args['include_actions'] : true));
             case 'device_set_description': return tool_result(tool_device_set_description((int)($args['equipment_id'] ?? 0), (string)($args['description'] ?? '')));
-            case 'devices_states':      return tool_result(tool_devices_states($args['equipment_ids'] ?? null, $args['categories'] ?? null, intval($args['limit'] ?? 50), intval($args['offset'] ?? 0)));
+            case 'devices_states':      return tool_result(tool_devices_states($args['equipment_ids'] ?? []));
             case 'command_execute':     return tool_result(tool_command_execute((int)($args['command_id'] ?? 0), $args['value'] ?? null));
             case 'rooms_list':          return tool_result(tool_rooms_list(intval($args['limit'] ?? 50), intval($args['offset'] ?? 0)));
             case 'room_set_description': return tool_result(tool_room_set_description((int)($args['room_id'] ?? 0), (string)($args['description'] ?? '')));
@@ -453,6 +438,45 @@ function active_categories($raw): array {
     return array_keys(array_filter($raw, function($v) { return $v == 1; }));
 }
 
+function cast_info_value(string $subType, $raw) {
+    if ($raw === null || $raw === '') return null;
+    switch ($subType) {
+        case 'binary':  return $raw == 1;
+        case 'numeric': return is_numeric($raw) ? floatval($raw) : null;
+        default:        return (string)$raw;
+    }
+}
+
+function fmt_state_map(array $cmds): array {
+    $state = [];
+    foreach ($cmds as $cmd) {
+        if ($cmd->getType() !== 'info') continue;
+        $name  = $cmd->getName() ?? '';
+        $value = cast_info_value($cmd->getSubType() ?? '', $cmd->getCache('value'));
+        if (array_key_exists($name, $state)) {
+            $suffixed = $name . '_' . intval($cmd->getId());
+            log::add('JeedomMCP', 'warning', "Duplicate info command name '{$name}' on equipment {$cmd->getEqLogic_id()} — using '{$suffixed}'");
+            $state[$suffixed] = $value;
+        } else {
+            $state[$name] = $value;
+        }
+    }
+    return $state;
+}
+
+function fmt_actions(array $cmds): array {
+    $actions = [];
+    foreach ($cmds as $cmd) {
+        if ($cmd->getType() !== 'action') continue;
+        $actions[] = [
+            'id'      => intval($cmd->getId()),
+            'name'    => $cmd->getName() ?? '',
+            'subType' => $cmd->getSubType() ?? 'other',
+        ];
+    }
+    return $actions;
+}
+
 function tool_acl_list(): array {
     $mode = config::byKey('acl_mode', 'JeedomMCP', 'read_execute');
 
@@ -465,7 +489,6 @@ function tool_acl_list(): array {
     // tool => [domain, operation]
     $tool_map = [
         'devices_list'           => ['devices',   'read'],
-        'device_state'           => ['devices',   'read'],
         'devices_states'         => ['devices',   'read'],
         'command_execute'        => ['devices',   'execution'],
         'device_set_description' => ['devices',   'set_description'],
@@ -501,11 +524,18 @@ function tool_acl_list(): array {
     return ['mode' => $mode, 'authorized_tools' => $authorized];
 }
 
-function tool_devices_list(?array $categories = null, int $limit = 50, int $offset = 0): array {
+function tool_devices_list(?array $categories = null, int $limit = 50, int $offset = 0, bool $include_state = true, bool $include_actions = true): array {
     acl_check('devices', 'read');
     $object_map = [];
     foreach (jeeObject::all() as $obj) {
         $object_map[$obj->getId()] = $obj->getName();
+    }
+
+    $commands_by_eq = [];
+    if ($include_state || $include_actions) {
+        foreach (cmd::all() as $cmd) {
+            $commands_by_eq[$cmd->getEqLogic_id()][] = $cmd;
+        }
     }
 
     $all = [];
@@ -513,7 +543,7 @@ function tool_devices_list(?array $categories = null, int $limit = 50, int $offs
         if ($eq->getIsEnable() != 1) continue;
         $eq_cats = active_categories($eq->getCategory());
         if (!empty($categories) && empty(array_intersect($categories, $eq_cats))) continue;
-        $all[] = [
+        $item = [
             'id'          => intval($eq->getId()),
             'name'        => $eq->getName() ?? '',
             'description' => $eq->getComment() ?: null,
@@ -522,6 +552,10 @@ function tool_devices_list(?array $categories = null, int $limit = 50, int $offs
             'categories'  => $eq_cats,
             'is_visible'  => $eq->getIsVisible() == 1,
         ];
+        $cmds = $commands_by_eq[$eq->getId()] ?? [];
+        if ($include_state)   $item['state']   = fmt_state_map($cmds);
+        if ($include_actions) $item['actions']  = fmt_actions($cmds);
+        $all[] = $item;
     }
 
     $total = count($all);
@@ -529,37 +563,6 @@ function tool_devices_list(?array $categories = null, int $limit = 50, int $offs
     return ['total' => $total, 'offset' => $offset, 'limit' => $limit, 'items' => $items];
 }
 
-function tool_device_state(int $equipment_id): array {
-    acl_check('devices', 'read');
-    $eq = eqLogic::byId($equipment_id);
-    if (!is_object($eq)) {
-        return ['error' => "Equipment {$equipment_id} not found"];
-    }
-
-    $commands = [];
-    foreach (cmd::byEqLogicId($equipment_id) as $cmd) {
-        $value = null;
-        if ($cmd->getType() === 'info') {
-            $value = $cmd->getCache('value');
-        }
-        $commands[] = [
-            'id'        => intval($cmd->getId()),
-            'name'      => $cmd->getName() ?? '',
-            'logicalId' => $cmd->getLogicalId() ?? '',
-            'type'      => $cmd->getType() ?? '',
-            'subType'   => $cmd->getSubType() ?? '',
-            'value'     => $value,
-        ];
-    }
-
-    return [
-        'equipment_id' => $equipment_id,
-        'name'         => $eq->getName() ?? '',
-        'description'  => $eq->getComment() ?: null,
-        'categories'   => active_categories($eq->getCategory()),
-        'commands'     => $commands,
-    ];
-}
 
 function fmt_equipment(eqLogic $eq): array {
     return [
@@ -581,97 +584,46 @@ function tool_device_set_description(int $equipment_id, string $description): ar
     return fmt_equipment($eq);
 }
 
-function tool_devices_states(?array $equipment_ids, ?array $categories = null, int $limit = 50, int $offset = 0): array {
+function tool_devices_states(array $equipment_ids): array {
     acl_check('devices', 'read');
-    $object_map = [];
-    foreach (jeeObject::all() as $obj) {
-        $object_map[$obj->getId()] = $obj->getName();
-    }
+    if (empty($equipment_ids)) throw new Exception('equipment_ids is required');
 
-    // Group all commands by equipment ID
+    $found = [];
+    $eq_map = [];
+    foreach (eqLogic::all() as $eq) {
+        if (in_array((int)$eq->getId(), $equipment_ids)) {
+            $found[]                  = (int)$eq->getId();
+            $eq_map[$eq->getId()]     = $eq;
+        }
+    }
+    $missing = array_diff($equipment_ids, $found);
+    if (!empty($missing)) throw new Exception('Equipment not found: ' . implode(', ', $missing));
+
     $commands_by_eq = [];
     foreach (cmd::all() as $cmd) {
         $eq_id = $cmd->getEqLogic_id();
-        $commands_by_eq[$eq_id][] = $cmd;
+        if (isset($eq_map[$eq_id])) $commands_by_eq[$eq_id][] = $cmd;
     }
 
-    if (!empty($equipment_ids)) {
-        $found = [];
-        foreach (eqLogic::all() as $eq) {
-            if (in_array((int)$eq->getId(), $equipment_ids)) $found[] = (int)$eq->getId();
-        }
-        $missing = array_diff($equipment_ids, $found);
-        if (!empty($missing)) {
-            throw new Exception('Equipment not found: ' . implode(', ', $missing));
-        }
+    $result = [];
+    foreach ($equipment_ids as $id) {
+        $cmds     = $commands_by_eq[$id] ?? [];
+        $result[] = ['id' => $id, 'state' => fmt_state_map($cmds)];
     }
-
-    $all = [];
-    foreach (eqLogic::all() as $eq) {
-        if ($eq->getIsEnable() != 1) continue;
-        if ($equipment_ids !== null && !in_array((int)$eq->getId(), $equipment_ids)) continue;
-        $eq_cats = active_categories($eq->getCategory());
-        if (!empty($categories) && empty(array_intersect($categories, $eq_cats))) continue;
-
-        $cmds = $commands_by_eq[$eq->getId()] ?? [];
-        $commands = [];
-        foreach ($cmds as $cmd) {
-            $value = ($cmd->getType() === 'info') ? $cmd->getCache('value') : null;
-            $commands[] = [
-                'id'        => intval($cmd->getId()),
-                'name'      => $cmd->getName() ?? '',
-                'logicalId' => $cmd->getLogicalId() ?? '',
-                'type'      => $cmd->getType() ?? '',
-                'subType'   => $cmd->getSubType() ?? '',
-                'value'     => $value,
-            ];
-        }
-
-        $all[] = [
-            'id'          => intval($eq->getId()),
-            'name'        => $eq->getName() ?? '',
-            'description' => $eq->getComment() ?: null,
-            'object_name' => $object_map[$eq->getObject_id()] ?? null,
-            'categories'  => $eq_cats,
-            'is_visible'  => $eq->getIsVisible() == 1,
-            'commands'    => $commands,
-        ];
-    }
-
-    $total = count($all);
-    $items = $limit > 0 ? array_slice($all, $offset, $limit) : array_slice($all, $offset);
-    return ['total' => $total, 'offset' => $offset, 'limit' => $limit, 'items' => $items];
+    return $result;
 }
 
 function tool_command_execute(int $command_id, ?string $value): array {
     acl_check('devices', 'execution');
     $cmd = cmd::byId($command_id);
-    if (!is_object($cmd)) {
-        return ['error' => "Command {$command_id} not found"];
-    }
+    if (!is_object($cmd)) throw new Exception("Command {$command_id} not found");
     $options = ($value !== null) ? ['slider' => $value] : [];
     $cmd->execCmd($options);
 
     $eq = $cmd->getEqLogic();
     if (!is_object($eq)) throw new Exception("Equipment for command {$command_id} not found");
-    $commands = [];
-    foreach (cmd::byEqLogicId($eq->getId()) as $c) {
-        $commands[] = [
-            'id'        => intval($c->getId()),
-            'name'      => $c->getName() ?? '',
-            'logicalId' => $c->getLogicalId() ?? '',
-            'type'      => $c->getType() ?? '',
-            'subType'   => $c->getSubType() ?? '',
-            'value'     => ($c->getType() === 'info') ? $c->getCache('value') : null,
-        ];
-    }
-    return [
-        'equipment_id' => intval($eq->getId()),
-        'name'         => $eq->getName() ?? '',
-        'description'  => $eq->getComment() ?: null,
-        'categories'   => active_categories($eq->getCategory()),
-        'commands'     => $commands,
-    ];
+    $cmds = cmd::byEqLogicId($eq->getId());
+    return ['id' => intval($eq->getId()), 'state' => fmt_state_map($cmds)];
 }
 
 function tool_rooms_list(int $limit = 50, int $offset = 0): array {
