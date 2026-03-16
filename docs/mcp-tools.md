@@ -129,19 +129,22 @@ Lightweight bulk refresh tool. Returns only the current state for a specific set
 
 ## `command_execute`
 
-Executes an action command on a Jeedom equipment.
+Executes one or more action commands. Multiple IDs can be passed in a single call to act on several devices at once (e.g. turn off all lights).
 
 **Parameters**:
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `command_id` | int | yes | Command ID (from `devices_list` actions) |
-| `value` | string | no | Required for `slider`, `color`, `message` subTypes |
+| `command_ids` | int[] | yes | One or more command IDs (from `devices_list` actions) |
+| `value` | string | no | Value for `slider`, `color`, `message` subTypes — applied to all commands in the batch |
 
-**Returns**: updated state of the equipment (same shape as one entry from `devices_states`)
+**Returns**: array of updated states, one entry per affected equipment (same shape as `devices_states`)
 
 ```json
-{"id": 42, "state": {"State": true, "Brightness": 75}}
+[
+  {"id": 42, "state": {"State": false}},
+  {"id": 43, "state": {"State": false}}
+]
 ```
 
 ---
