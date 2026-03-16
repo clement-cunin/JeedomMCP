@@ -7,5 +7,8 @@
     "require": "4.4",
     "category": "programming",
     "hasDependency": false,
-    "hasOwnDeamon": false
+    "hasOwnDeamon": false,
+    "changelog": "https://github.com/clement-cunin/JeedomMCP/blob/main/CHANGELOG.md",
+    "documentation": "https://github.com/clement-cunin/JeedomMCP/blob/main/docs/",
+    "link": "https://github.com/clement-cunin/JeedomMCP"
 }
