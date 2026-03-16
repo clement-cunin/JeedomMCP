@@ -38,13 +38,15 @@ Returns the current ACL mode and all authorized operations. Call this first to k
 
 ## `devices_list`
 
-Lists all enabled Jeedom equipment. Returns a paginated response.
+Discovery tool. Lists all enabled Jeedom equipment with their current state and available actions. Returns a paginated response.
 
 **Parameters**:
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `categories` | string[] | no | Filter by category — returns equipment matching at least one. Valid values: `heating`, `security`, `energy`, `light`, `opening`, `automatism`, `multimedia`, `default` |
+| `categories` | string[] | no | Filter by category. Valid values: `heating`, `security`, `energy`, `light`, `opening`, `automatism`, `multimedia`, `default` |
+| `include_state` | bool | no | Include the `state` map per device (default: `true`) |
+| `include_actions` | bool | no | Include the `actions` array per device (default: `true`) |
 | `limit` | int | no | Maximum number of items to return (default: 50). Use 0 for no limit. |
 | `offset` | int | no | Number of items to skip (default: 0). |
 
@@ -63,38 +65,25 @@ Lists all enabled Jeedom equipment. Returns a paginated response.
       "object_id": 12,
       "object_name": "Living room",
       "categories": ["light"],
-      "is_visible": true
+      "is_visible": true,
+      "state": {
+        "State": true,
+        "Brightness": 75
+      },
+      "actions": [
+        {"id": 103, "name": "On",             "subType": "other"},
+        {"id": 104, "name": "Off",            "subType": "other"},
+        {"id": 105, "name": "Set brightness", "subType": "slider"}
+      ]
     }
   ]
 }
 ```
 
----
-
-## `device_state`
-
-Gets the current state of a specific equipment and all its info commands.
-
-**Parameters**:
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `equipment_id` | int | yes | Equipment ID (from `devices_list`) |
-
-**Returns**:
-
-```json
-{
-  "equipment_id": 42,
-  "name": "Living room light",
-  "description": "Ceiling light, Z-Wave dimmer",
-  "categories": ["light"],
-  "commands": [
-    { "id": 101, "name": "State", "logicalId": "state", "type": "info", "subType": "binary", "value": "1" },
-    { "id": 102, "name": "Brightness", "logicalId": "brightness", "type": "info", "subType": "numeric", "value": "75" }
-  ]
-}
-```
+| Field | Description |
+|-------|-------------|
+| `state` | Map of info command name → typed value (`bool`, `float`, `string`, or `null`). Omitted if `include_state=false`. |
+| `actions` | List of executable commands. `subType` indicates whether `command_execute` requires a `value` (`slider`, `color`, `message`) or not (`other`). Omitted if `include_actions=false`. |
 
 ---
 
@@ -119,39 +108,21 @@ Sets the description (comment field) of a Jeedom equipment.
 
 ## `devices_states`
 
-Gets the current state of all equipment and their commands in a single call. Returns a paginated response.
+Lightweight bulk refresh tool. Returns only the current state for a specific set of equipment. Use `devices_list` for full discovery (metadata + actions).
 
 **Parameters**:
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `equipment_ids` | int[] | no | Filter to specific equipment IDs. If omitted, returns all enabled equipment. |
-| `categories` | string[] | no | Filter by category — returns equipment matching at least one. Valid values: `heating`, `security`, `energy`, `light`, `opening`, `automatism`, `multimedia`, `default` |
-| `limit` | int | no | Maximum number of items to return (default: 50). Use 0 for no limit. |
-| `offset` | int | no | Number of items to skip (default: 0). |
+| `equipment_ids` | int[] | yes | IDs of the equipment to refresh. |
 
-**Returns**: paginated object with equipment and their commands
+**Returns**: array of `{id, state}` in the same order as the input IDs
 
 ```json
-{
-  "total": 87,
-  "offset": 0,
-  "limit": 50,
-  "items": [
-    {
-      "id": 42,
-      "name": "Living room light",
-      "description": "Ceiling light, Z-Wave dimmer",
-      "object_name": "Living room",
-      "categories": ["light"],
-      "is_visible": true,
-      "commands": [
-        { "id": 101, "name": "State", "logicalId": "state", "type": "info", "subType": "binary", "value": "1" },
-        { "id": 103, "name": "On", "logicalId": "on", "type": "action", "subType": "other", "value": null }
-      ]
-    }
-  ]
-}
+[
+  {"id": 42, "state": {"State": true, "Brightness": 75}},
+  {"id": 43, "state": {"Temperature": 21.5, "Humidity": 58.0}}
+]
 ```
 
 ---
@@ -164,28 +135,13 @@ Executes an action command on a Jeedom equipment.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `command_id` | int | yes | Command ID (from `device_state`) |
-| `value` | string | no | Value for slider/text commands |
+| `command_id` | int | yes | Command ID (from `devices_list` actions) |
+| `value` | string | no | Required for `slider`, `color`, `message` subTypes |
 
-**Returns**: updated equipment state (same structure as `device_state`)
-
-```json
-{
-  "equipment_id": 42,
-  "name": "Living room light",
-  "description": "Ceiling light, Z-Wave dimmer",
-  "categories": ["light"],
-  "commands": [
-    { "id": 101, "name": "State", "logicalId": "state", "type": "info", "subType": "binary", "value": "1" },
-    { "id": 103, "name": "On", "logicalId": "on", "type": "action", "subType": "other", "value": null }
-  ]
-}
-```
-
-**Error**:
+**Returns**: updated state of the equipment (same shape as one entry from `devices_states`)
 
 ```json
-{ "error": "Command 103 not found" }
+{"id": 42, "state": {"State": true, "Brightness": 75}}
 ```
 
 ---
