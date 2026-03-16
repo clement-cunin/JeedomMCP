@@ -526,10 +526,6 @@ function tool_acl_list(): array {
 
 function tool_devices_list(?array $categories = null, int $limit = 50, int $offset = 0, bool $include_state = true, bool $include_actions = true): array {
     acl_check('devices', 'read');
-    $object_map = [];
-    foreach (jeeObject::all() as $obj) {
-        $object_map[$obj->getId()] = $obj->getName();
-    }
 
     $commands_by_eq = [];
     if ($include_state || $include_actions) {
@@ -543,15 +539,11 @@ function tool_devices_list(?array $categories = null, int $limit = 50, int $offs
         if ($eq->getIsEnable() != 1) continue;
         $eq_cats = active_categories($eq->getCategory());
         if (!empty($categories) && empty(array_intersect($categories, $eq_cats))) continue;
-        $item = [
-            'id'          => intval($eq->getId()),
-            'name'        => $eq->getName() ?? '',
-            'description' => $eq->getComment() ?: null,
-            'object_id'   => $eq->getObject_id() ? intval($eq->getObject_id()) : null,
-            'object_name' => $object_map[$eq->getObject_id()] ?? null,
-            'categories'  => $eq_cats,
-            'is_visible'  => $eq->getIsVisible() == 1,
-        ];
+        $item = ['id' => intval($eq->getId()), 'name' => $eq->getName() ?? ''];
+        if ($eq->getComment())      $item['description'] = $eq->getComment();
+        if ($eq->getObject_id())    $item['room_id']     = intval($eq->getObject_id());
+        if (!empty($eq_cats))       $item['categories']  = $eq_cats;
+        if ($eq->getIsVisible() != 1) $item['is_visible'] = false;
         $cmds = $commands_by_eq[$eq->getId()] ?? [];
         if ($include_state)   $item['state']   = fmt_state_map($cmds);
         if ($include_actions) $item['actions']  = fmt_actions($cmds);
@@ -565,14 +557,13 @@ function tool_devices_list(?array $categories = null, int $limit = 50, int $offs
 
 
 function fmt_equipment(eqLogic $eq): array {
-    return [
-        'id'          => intval($eq->getId()),
-        'name'        => $eq->getName() ?? '',
-        'description' => $eq->getComment() ?: null,
-        'object_id'   => $eq->getObject_id() ? intval($eq->getObject_id()) : null,
-        'categories'  => active_categories($eq->getCategory()),
-        'is_visible'  => $eq->getIsVisible() == 1,
-    ];
+    $item = ['id' => intval($eq->getId()), 'name' => $eq->getName() ?? ''];
+    if ($eq->getComment())                        $item['description'] = $eq->getComment();
+    if ($eq->getObject_id())                      $item['room_id']     = intval($eq->getObject_id());
+    $cats = active_categories($eq->getCategory());
+    if (!empty($cats))                            $item['categories']  = $cats;
+    if ($eq->getIsVisible() != 1)                 $item['is_visible']  = false;
+    return $item;
 }
 
 function tool_device_set_description(int $equipment_id, string $description): array {
