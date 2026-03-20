@@ -17,7 +17,7 @@
 - Pagination (`limit` / `offset`) on all list tools
 - `devices_list` returns `state` map and `actions` per device with optional `include_state` / `include_actions` flags
 - `devices_states` lightweight bulk refresh — requires `equipment_ids`, returns `[{id, state}]` only
-- `command_execute` accepts `command_ids` array for bulk execution in a single call
+- `command_execute` accepts a `commands` array of `{id|ids, value?}` entries for per-command values in a single call
 - `devices_list` accepts optional `room_ids` filter to return only devices belonging to specific rooms
 - Info commands as a typed `state` map (`binary` → `bool`, `numeric` → `float`)
 - Action commands in an `actions` array — `logicalId` and redundant fields removed
