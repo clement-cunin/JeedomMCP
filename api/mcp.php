@@ -157,6 +157,11 @@ function mcp_get_tools(): array {
                         'items'       => ['type' => 'string', 'enum' => ['heating', 'security', 'energy', 'light', 'opening', 'automatism', 'multimedia', 'default']],
                         'description' => 'Filter by category — returns equipment matching at least one.',
                     ],
+                    'room_ids'        => [
+                        'type'        => 'array',
+                        'items'       => ['type' => 'integer'],
+                        'description' => 'Filter by room — returns only equipment whose room_id is in this list.',
+                    ],
                     'include_state'   => ['type' => 'boolean', 'description' => 'Include the state map for each device (default true).'],
                     'include_actions' => ['type' => 'boolean', 'description' => 'Include the actions array for each device (default true).'],
                     'limit'           => ['type' => 'integer', 'description' => 'Maximum number of items to return (default 50). Use 0 for no limit.'],
@@ -387,7 +392,7 @@ function mcp_call_tool(string $name, array $args): array {
     try {
         switch ($name) {
             case 'acl_list':            return tool_result(tool_acl_list());
-            case 'devices_list':        return tool_result(tool_devices_list($args['categories'] ?? null, intval($args['limit'] ?? 50), intval($args['offset'] ?? 0), isset($args['include_state']) ? (bool)$args['include_state'] : true, isset($args['include_actions']) ? (bool)$args['include_actions'] : true));
+            case 'devices_list':        return tool_result(tool_devices_list($args['categories'] ?? null, $args['room_ids'] ?? null, intval($args['limit'] ?? 50), intval($args['offset'] ?? 0), isset($args['include_state']) ? (bool)$args['include_state'] : true, isset($args['include_actions']) ? (bool)$args['include_actions'] : true));
             case 'device_set_description': return tool_result(tool_device_set_description((int)($args['equipment_id'] ?? 0), (string)($args['description'] ?? '')));
             case 'devices_states':      return tool_result(tool_devices_states($args['equipment_ids'] ?? []));
             case 'command_execute':     return tool_result(tool_command_execute($args['command_ids'] ?? [], $args['value'] ?? null));
@@ -528,8 +533,13 @@ function tool_acl_list(): array {
     return ['mode' => $mode, 'authorized_tools' => $authorized];
 }
 
-function tool_devices_list(?array $categories = null, int $limit = 50, int $offset = 0, bool $include_state = true, bool $include_actions = true): array {
+function tool_devices_list(?array $categories = null, ?array $room_ids = null, int $limit = 50, int $offset = 0, bool $include_state = true, bool $include_actions = true): array {
     acl_check('devices', 'read');
+
+    $room_ids_int = null;
+    if (!empty($room_ids)) {
+        $room_ids_int = array_map('intval', $room_ids);
+    }
 
     $commands_by_eq = [];
     if ($include_state || $include_actions) {
@@ -543,6 +553,7 @@ function tool_devices_list(?array $categories = null, int $limit = 50, int $offs
         if ($eq->getIsEnable() != 1) continue;
         $eq_cats = active_categories($eq->getCategory());
         if (!empty($categories) && empty(array_intersect($categories, $eq_cats))) continue;
+        if ($room_ids_int !== null && !in_array(intval($eq->getObject_id()), $room_ids_int, true)) continue;
         $item = ['id' => intval($eq->getId()), 'name' => $eq->getName() ?? ''];
         if ($eq->getComment())      $item['description'] = $eq->getComment();
         if ($eq->getObject_id())    $item['room_id']     = intval($eq->getObject_id());
