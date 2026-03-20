@@ -199,18 +199,24 @@ function mcp_get_tools(): array {
         ],
         [
             'name'        => 'command_execute',
-            'description' => 'Execute one or more action commands. Pass multiple IDs to act on several devices in a single call (e.g. turn off all lights).',
+            'description' => 'Execute one or more action commands with optional per-command values. Use {id, value} for a single command, {ids, value} to share a value across several commands.',
             'inputSchema' => [
                 'type'       => 'object',
                 'properties' => [
-                    'command_ids' => [
+                    'commands' => [
                         'type'        => 'array',
-                        'items'       => ['type' => 'integer'],
-                        'description' => 'One or more command IDs to execute (from devices_list actions).',
+                        'description' => 'List of commands to execute. Each entry has either "id" (int) or "ids" (int[]), plus an optional "value" string.',
+                        'items'       => [
+                            'type'       => 'object',
+                            'properties' => [
+                                'id'    => ['type' => 'integer', 'description' => 'Single command ID.'],
+                                'ids'   => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'Multiple command IDs sharing the same value.'],
+                                'value' => ['type' => 'string', 'description' => 'Value for slider, color or message subTypes.'],
+                            ],
+                        ],
                     ],
-                    'value' => ['type' => 'string', 'description' => 'Value for slider, color or message commands — applied to all commands in the batch.'],
                 ],
-                'required' => ['command_ids'],
+                'required' => ['commands'],
             ],
         ],
         [
@@ -395,7 +401,7 @@ function mcp_call_tool(string $name, array $args): array {
             case 'devices_list':        return tool_result(tool_devices_list($args['categories'] ?? null, $args['room_ids'] ?? null, intval($args['limit'] ?? 50), intval($args['offset'] ?? 0), isset($args['include_state']) ? (bool)$args['include_state'] : true, isset($args['include_actions']) ? (bool)$args['include_actions'] : true));
             case 'device_set_description': return tool_result(tool_device_set_description((int)($args['equipment_id'] ?? 0), (string)($args['description'] ?? '')));
             case 'devices_states':      return tool_result(tool_devices_states($args['equipment_ids'] ?? []));
-            case 'command_execute':     return tool_result(tool_command_execute($args['command_ids'] ?? [], $args['value'] ?? null));
+            case 'command_execute':     return tool_result(tool_command_execute($args['commands'] ?? []));
             case 'rooms_list':          return tool_result(tool_rooms_list(intval($args['limit'] ?? 50), intval($args['offset'] ?? 0)));
             case 'room_set_description': return tool_result(tool_room_set_description((int)($args['room_id'] ?? 0), (string)($args['description'] ?? '')));
             case 'room_create':         return tool_result(tool_room_create((string)($args['name'] ?? ''), $args['description'] ?? null, $args['surface'] ?? null, isset($args['orientation']) ? (int)$args['orientation'] : null, isset($args['parent_id']) ? (int)$args['parent_id'] : null));
@@ -620,18 +626,22 @@ function tool_devices_states(array $equipment_ids): array {
     return $result;
 }
 
-function tool_command_execute(array $command_ids, ?string $value): array {
+function tool_command_execute(array $commands): array {
     acl_check('devices', 'execution');
-    if (empty($command_ids)) throw new Exception('command_ids is required');
+    if (empty($commands)) throw new Exception('commands is required');
 
-    $options       = ($value !== null) ? ['slider' => $value] : [];
-    $affected_eq   = [];
-    foreach ($command_ids as $command_id) {
-        $cmd = cmd::byId($command_id);
-        if (!is_object($cmd)) throw new Exception("Command {$command_id} not found");
-        $cmd->execCmd($options);
-        $eq_id = intval($cmd->getEqLogic_id());
-        if (!isset($affected_eq[$eq_id])) $affected_eq[$eq_id] = true;
+    $affected_eq = [];
+    foreach ($commands as $entry) {
+        $ids     = isset($entry['ids']) ? (array)$entry['ids'] : [(int)($entry['id'] ?? 0)];
+        $value   = $entry['value'] ?? null;
+        $options = ($value !== null) ? ['slider' => $value] : [];
+        foreach ($ids as $command_id) {
+            $cmd = cmd::byId($command_id);
+            if (!is_object($cmd)) throw new Exception("Command {$command_id} not found");
+            $cmd->execCmd($options);
+            $eq_id = intval($cmd->getEqLogic_id());
+            if (!isset($affected_eq[$eq_id])) $affected_eq[$eq_id] = true;
+        }
     }
 
     $result = [];

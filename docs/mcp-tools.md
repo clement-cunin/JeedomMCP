@@ -130,14 +130,33 @@ Lightweight bulk refresh tool. Returns only the current state for a specific set
 
 ## `command_execute`
 
-Executes one or more action commands. Multiple IDs can be passed in a single call to act on several devices at once (e.g. turn off all lights).
+Executes one or more action commands with optional per-command values.
 
 **Parameters**:
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `command_ids` | int[] | yes | One or more command IDs (from `devices_list` actions) |
-| `value` | string | no | Value for `slider`, `color`, `message` subTypes — applied to all commands in the batch |
+| `commands` | object[] | yes | List of commands to execute |
+
+Each entry in `commands` supports:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | int | Single command ID |
+| `ids` | int[] | Multiple command IDs sharing the same value |
+| `value` | string | Value for `slider`, `color`, `message` subTypes (optional) |
+
+Use `id` for a single command, `ids` to apply the same value to several commands at once.
+
+```json
+{
+  "commands": [
+    { "ids": [796, 823], "value": "30" },
+    { "id": 778 },
+    { "id": 831, "value": "80" }
+  ]
+}
+```
 
 **Returns**: array of updated states, one entry per affected equipment (same shape as `devices_states`)
 
