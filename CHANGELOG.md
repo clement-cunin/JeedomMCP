@@ -21,3 +21,4 @@
 - Info commands as a typed `state` map (`binary` → `bool`, `numeric` → `float`)
 - Action commands in an `actions` array — `logicalId` and redundant fields removed
 - `devices_list`: `room_id` replaces `object_id`, `object_name` removed, null/default fields omitted
+- State maps omit null-valued fields; empty state returns `{}` instead of `[]`

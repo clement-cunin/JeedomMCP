@@ -451,12 +451,13 @@ function cast_info_value(string $subType, $raw) {
     }
 }
 
-function fmt_state_map(array $cmds): array {
+function fmt_state_map(array $cmds): object {
     $state = [];
     foreach ($cmds as $cmd) {
         if ($cmd->getType() !== 'info') continue;
         $name  = $cmd->getName() ?? '';
         $value = cast_info_value($cmd->getSubType() ?? '', $cmd->getCache('value'));
+        if ($value === null) continue;
         if (array_key_exists($name, $state)) {
             $suffixed = $name . '_' . intval($cmd->getId());
             log::add('JeedomMCP', 'warning', "Duplicate info command name '{$name}' on equipment {$cmd->getEqLogic_id()} — using '{$suffixed}'");
@@ -465,7 +466,7 @@ function fmt_state_map(array $cmds): array {
             $state[$name] = $value;
         }
     }
-    return $state;
+    return (object)$state;
 }
 
 function fmt_actions(array $cmds): array {

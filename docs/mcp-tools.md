@@ -82,7 +82,7 @@ Discovery tool. Lists all enabled Jeedom equipment with their current state and 
 
 | Field | Description |
 |-------|-------------|
-| `state` | Map of info command name → typed value (`bool`, `float`, `string`, or `null`). Omitted if `include_state=false`. |
+| `state` | Map of info command name → typed value (`bool`, `float`, `string`). Null values are omitted. Returns `{}` when the device has no info commands. Omitted entirely if `include_state=false`. |
 | `actions` | List of executable commands. `subType` indicates whether `command_execute` requires a `value` (`slider`, `color`, `message`) or not (`other`). Omitted if `include_actions=false`. |
 
 ---
