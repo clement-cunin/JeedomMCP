@@ -542,3 +542,57 @@ Common errors:
 | `Equipment not found` | Invalid or disabled equipment ID |
 | `Command not found` | Invalid command ID |
 | `Jeedom API error` | Invalid Jeedom API key or Jeedom unreachable |
+
+---
+
+## Admin tools
+
+Admin tools require ACL mode **Full access + Admin** (`full_admin`) or Custom mode with the relevant `admin_*` operations enabled.
+
+---
+
+## `logs_list`
+
+Lists available Jeedom log files with their size, last modification date, and highest severity level found.
+
+**Parameters**: none
+
+**Returns**:
+
+```json
+[
+  { "name": "JeedomMCP", "size": 4096,   "modified": "2026-03-21 14:32:00", "max_level": "INFO" },
+  { "name": "zwave",     "size": 102400, "modified": "2026-03-21 14:30:00", "max_level": "WARNING" }
+]
+```
+
+---
+
+## `log_read`
+
+Reads lines from a Jeedom log file, with optional level filter, text search, and pagination from the end.
+
+> **Warning**: log files may contain sensitive data such as API keys and passwords.
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `log` | string | yes | Log file name (from `logs_list`) |
+| `lines` | int | no | Number of lines to return (default: 100) |
+| `offset` | int | no | Lines to skip from the end before reading (default: 0) — use to paginate backwards |
+| `min_level` | string | no | Minimum severity level: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
+| `search` | string | no | Case-insensitive string filter — only lines containing this text are returned |
+
+Filters are applied before pagination: `total` reflects the filtered line count.
+
+**Returns**:
+
+```json
+{
+  "log": "zwave",
+  "total": 42,
+  "offset": 0,
+  "lines": ["[2026-03-21 14:32:00][WARNING][zwave] : node 12 ...", "..."]
+}
+```
