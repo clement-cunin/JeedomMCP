@@ -23,3 +23,5 @@
 - Action commands in an `actions` array — `logicalId` and redundant fields removed
 - `devices_list`: `room_id` replaces `object_id`, `object_name` removed, null/default fields omitted
 - State maps omit null-valued fields; empty state returns `{}` instead of `[]`
+- Admin log tools: `logs_list` and `log_read` (ACL domain `admin_logs`)
+- New ACL preset `full_admin` — grants full access including all admin operations

@@ -41,24 +41,24 @@ function tool_error(string $message): array {
     return ['content' => [['type' => 'text', 'text' => json_encode(['error' => $message])]], 'isError' => true];
 }
 
-function acl_check(string $domain, string $operation): void {
+function acl_allowed(string $domain, string $operation): bool {
     $mode = config::byKey('acl_mode', 'JeedomMCP', 'read_execute');
     switch ($mode) {
-        case 'full':
-            return;
+        case 'full_admin': return true;
+        case 'full':       return strncmp($domain, 'admin', 5) !== 0;
         case 'read_execute_describe':
-            if (in_array($operation, ['read', 'execution', 'set_description'])) return;
-            break;
+            return in_array($operation, ['read', 'execution', 'set_description']);
         case 'custom':
-            $allowed = config::byKey("acl_{$domain}_{$operation}", 'JeedomMCP', '0');
-            if ($allowed == 1) return;
-            break;
-        case 'read_execute':
-        default:
-            if (in_array($operation, ['read', 'execution'])) return;
-            break;
+            return config::byKey("acl_{$domain}_{$operation}", 'JeedomMCP', '0') == 1;
+        default: // read_execute
+            return in_array($operation, ['read', 'execution']);
     }
-    throw new Exception("Operation '{$operation}' on '{$domain}' is not authorized");
+}
+
+function acl_check(string $domain, string $operation): void {
+    if (!acl_allowed($domain, $operation)) {
+        throw new Exception("Operation '{$operation}' on '{$domain}' is not authorized");
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -372,6 +372,26 @@ function mcp_get_tools(): array {
             ],
         ],
         [
+            'name'        => 'logs_list',
+            'description' => 'List available Jeedom log files with their size and last modification date.',
+            'inputSchema' => ['type' => 'object', 'properties' => new stdClass(), 'required' => []],
+        ],
+        [
+            'name'        => 'log_read',
+            'description' => 'Read the last N lines of a Jeedom log file. May contain sensitive data (API keys, passwords).',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'log'       => ['type' => 'string',  'description' => 'Log file name (from logs_list).'],
+                    'lines'     => ['type' => 'integer', 'description' => 'Number of lines to return (default 100).'],
+                    'offset'    => ['type' => 'integer', 'description' => 'Number of lines to skip from the end before reading (default 0). Use to paginate backwards.'],
+                    'min_level' => ['type' => 'string',  'description' => 'Minimum severity level to include: DEBUG, INFO, WARNING, ERROR, CRITICAL.', 'enum' => ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']],
+                    'search'    => ['type' => 'string',  'description' => 'Case-insensitive string filter — only lines containing this text are returned.'],
+                ],
+                'required' => ['log'],
+            ],
+        ],
+        [
             'name'        => 'scenario_create',
             'description' => 'Create a new Jeedom scenario.',
             'inputSchema' => [
@@ -415,6 +435,8 @@ function mcp_call_tool(string $name, array $args): array {
             case 'scenario_set_description': return tool_result(tool_scenario_set_description((int)($args['scenario_id'] ?? 0), (string)($args['description'] ?? '')));
             case 'scenario_update':     return tool_result(tool_scenario_update($args));
             case 'scenario_create':     return tool_result(tool_scenario_create($args));
+            case 'logs_list':           return tool_result(tool_logs_list());
+            case 'log_read':            return tool_result(tool_log_read((string)($args['log'] ?? ''), intval($args['lines'] ?? 100), intval($args['offset'] ?? 0), $args['min_level'] ?? null, $args['search'] ?? null));
             default:                    return tool_error('Unknown tool: ' . $name);
         }
     } catch (Exception $e) {
@@ -496,45 +518,32 @@ function fmt_actions(array $cmds): array {
 function tool_acl_list(): array {
     $mode = config::byKey('acl_mode', 'JeedomMCP', 'read_execute');
 
-    $mode_ops = [
-        'read_execute'          => ['read', 'execution'],
-        'read_execute_describe' => ['read', 'execution', 'set_description'],
-        'full'                  => ['read', 'execution', 'set_description', 'create', 'update', 'delete'],
-    ];
-
     // tool => [domain, operation]
     $tool_map = [
-        'devices_list'           => ['devices',   'read'],
-        'devices_states'         => ['devices',   'read'],
-        'command_execute'        => ['devices',   'execution'],
-        'device_set_description' => ['devices',   'set_description'],
-        'rooms_list'             => ['rooms',     'read'],
-        'room_set_description'   => ['rooms',     'set_description'],
-        'room_create'            => ['rooms',     'create'],
-        'room_update'            => ['rooms',     'update'],
-        'room_delete'            => ['rooms',     'delete'],
-        'scenarios_list'         => ['scenarios', 'read'],
-        'scenario_get_actions'   => ['scenarios', 'read'],
-        'scenario_run'           => ['scenarios', 'execution'],
-        'scenario_set_description' => ['scenarios', 'set_description'],
-        'scenario_create'        => ['scenarios', 'create'],
-        'scenario_update'        => ['scenarios', 'update'],
-        'scenario_set_actions'   => ['scenarios', 'update'],
-        'scenario_delete'        => ['scenarios', 'delete'],
+        'devices_list'             => ['devices',    'read'],
+        'devices_states'           => ['devices',    'read'],
+        'command_execute'          => ['devices',    'execution'],
+        'device_set_description'   => ['devices',    'set_description'],
+        'rooms_list'               => ['rooms',      'read'],
+        'room_set_description'     => ['rooms',      'set_description'],
+        'room_create'              => ['rooms',      'create'],
+        'room_update'              => ['rooms',      'update'],
+        'room_delete'              => ['rooms',      'delete'],
+        'scenarios_list'           => ['scenarios',  'read'],
+        'scenario_get_actions'     => ['scenarios',  'read'],
+        'scenario_run'             => ['scenarios',  'execution'],
+        'scenario_set_description' => ['scenarios',  'set_description'],
+        'scenario_create'          => ['scenarios',  'create'],
+        'scenario_update'          => ['scenarios',  'update'],
+        'scenario_set_actions'     => ['scenarios',  'update'],
+        'scenario_delete'          => ['scenarios',  'delete'],
+        'logs_list'                => ['admin_logs', 'read'],
+        'log_read'                 => ['admin_logs', 'read'],
     ];
-
-    $allowed_ops = $mode_ops[$mode] ?? ['read', 'execution'];
 
     $authorized = ['acl_list']; // always accessible
     foreach ($tool_map as $tool => $domain_op) {
-        $domain = $domain_op[0];
-        $op     = $domain_op[1];
-        if ($mode === 'custom') {
-            $ok = config::byKey("acl_{$domain}_{$op}", 'JeedomMCP', '0') == 1;
-        } else {
-            $ok = in_array($op, $allowed_ops);
-        }
-        if ($ok) $authorized[] = $tool;
+        if (acl_allowed($domain_op[0], $domain_op[1])) $authorized[] = $tool;
     }
 
     return ['mode' => $mode, 'authorized_tools' => $authorized];
@@ -857,4 +866,78 @@ function tool_scenario_create(array $args): array {
         return ['error' => 'Scenario creation failed: no ID returned'];
     }
     return fmt_scenario($s);
+}
+
+// ---------------------------------------------------------------------------
+// Admin — Logs
+// ---------------------------------------------------------------------------
+
+$LOG_LEVELS = ['DEBUG' => 0, 'INFO' => 1, 'WARNING' => 2, 'ERROR' => 3, 'CRITICAL' => 4];
+
+function log_max_level(string $path): ?string {
+    global $LOG_LEVELS;
+    $max = -1;
+    $max_name = null;
+    $handle = fopen($path, 'r');
+    if (!$handle) return null;
+    while (($line = fgets($handle)) !== false) {
+        if (preg_match('/\[(DEBUG|INFO|WARNING|ERROR|CRITICAL)\]/i', $line, $m)) {
+            $lvl = strtoupper($m[1]);
+            if ($LOG_LEVELS[$lvl] > $max) {
+                $max      = $LOG_LEVELS[$lvl];
+                $max_name = $lvl;
+            }
+        }
+    }
+    fclose($handle);
+    return $max_name;
+}
+
+function tool_logs_list(): array {
+    acl_check('admin_logs', 'read');
+    $result = [];
+    foreach (log::liste() as $name) {
+        $path = log::getPathToLog($name);
+        $item = ['name' => $name];
+        if (file_exists($path)) {
+            $item['size']      = filesize($path);
+            $item['modified']  = date('Y-m-d H:i:s', filemtime($path));
+            $item['max_level'] = log_max_level($path);
+        }
+        $result[] = $item;
+    }
+    return $result;
+}
+
+function tool_log_read(string $log, int $lines = 100, int $offset = 0, ?string $min_level = null, ?string $search = null): array {
+    global $LOG_LEVELS;
+    acl_check('admin_logs', 'read');
+    if ($log === '') throw new Exception('log is required');
+    $path = log::getPathToLog($log);
+    if (!file_exists($path)) throw new Exception("Log '{$log}' not found");
+    $min_rank = ($min_level !== null) ? ($LOG_LEVELS[strtoupper($min_level)] ?? 0) : -1;
+    $all = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if ($min_rank >= 0) {
+        $all = array_values(array_filter($all, function ($line) use ($min_rank) {
+            global $LOG_LEVELS;
+            if (preg_match('/\[(DEBUG|INFO|WARNING|ERROR|CRITICAL)\]/i', $line, $m)) {
+                return $LOG_LEVELS[strtoupper($m[1])] >= $min_rank;
+            }
+            return false;
+        }));
+    }
+    if ($search !== null && $search !== '') {
+        $all = array_values(array_filter($all, function ($line) use ($search) {
+            return stripos($line, $search) !== false;
+        }));
+    }
+    $total = count($all);
+    // Paginate from the end: offset skips lines from the end, then take $lines
+    $slice = array_values(array_slice($all, -($offset + $lines), $lines));
+    return [
+        'log'    => $log,
+        'total'  => $total,
+        'offset' => $offset,
+        'lines'  => $slice,
+    ];
 }

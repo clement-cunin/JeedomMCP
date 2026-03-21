@@ -6,9 +6,10 @@ $mcpUrl = network::getNetworkAccess('external', 'proto:ip:port:comp') . '/plugin
 
 // ACL matrix: domain => [op => has_tool]
 $acl_matrix = [
-    'devices'   => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => false, 'update' => false, 'delete' => false],
-    'rooms'     => ['read' => true, 'execution' => false, 'set_description' => true, 'create' => true, 'update' => true, 'delete' => true],
-    'scenarios' => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => true, 'update' => true, 'delete' => true],
+    'devices'    => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => false, 'update' => false, 'delete' => false],
+    'rooms'      => ['read' => true, 'execution' => false, 'set_description' => true, 'create' => true, 'update' => true, 'delete' => true],
+    'scenarios'  => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => true, 'update' => true, 'delete' => true],
+    'admin_logs' => ['read' => true, 'execution' => false, 'set_description' => false, 'create' => false, 'update' => false, 'delete' => false],
 ];
 
 // Default preset: "Read & Execute"
@@ -18,7 +19,7 @@ $acl_defaults = [
 ];
 
 // Initialize acl_mode default
-if (!in_array((string)config::byKey('acl_mode', 'JeedomMCP'), ['read_execute', 'read_execute_describe', 'full', 'custom'], true)) {
+if (!in_array((string)config::byKey('acl_mode', 'JeedomMCP'), ['read_execute', 'read_execute_describe', 'full', 'full_admin', 'custom'], true)) {
     config::save('acl_mode', 'read_execute', 'JeedomMCP');
 }
 
@@ -35,9 +36,10 @@ foreach ($acl_matrix as $domain => $ops) {
 }
 
 $acl_domain_labels = [
-    'devices'   => '{{Devices}}',
-    'rooms'     => '{{Rooms}}',
-    'scenarios' => '{{Scenarios}}',
+    'devices'    => '{{Devices}}',
+    'rooms'      => '{{Rooms}}',
+    'scenarios'  => '{{Scenarios}}',
+    'admin_logs' => '{{Admin — Logs}}',
 ];
 $acl_op_labels = [
     'read'            => '{{View / List}}',
@@ -69,6 +71,9 @@ $acl_tools = [
         'create'          => ['scenario_create'],
         'update'          => ['scenario_update', 'scenario_set_actions'],
         'delete'          => ['scenario_delete'],
+    ],
+    'admin_logs' => [
+        'read' => ['logs_list', 'log_read'],
     ],
 ];
 ?>
@@ -119,6 +124,7 @@ $acl_tools = [
                     <option value="read_execute">{{Read &amp; Execute}}</option>
                     <option value="read_execute_describe">{{Read, Execute &amp; Set description}}</option>
                     <option value="full">{{Full access}}</option>
+                    <option value="full_admin">{{Full access + Admin}}</option>
                     <option value="custom">{{Custom}}</option>
                 </select>
             </div>
@@ -138,11 +144,11 @@ $acl_tools = [
                     </thead>
                     <tbody>
                         <?php foreach ($acl_matrix as $domain => $ops): ?>
-                        <tr>
+                        <tr<?php echo (strncmp($domain, 'admin', 5) === 0) ? ' data-admin="1"' : ''; ?>>
                             <th style="vertical-align:top;padding-top:10px"><?php echo $acl_domain_labels[$domain]; ?></th>
-                            <?php foreach ($ops as $op => $has_tool): ?>
-                            <td class="text-center" style="">
-                                <?php if ($has_tool): ?>
+                            <?php foreach (array_keys($acl_op_labels) as $op): ?>
+                            <td class="text-center">
+                                <?php if (!empty($ops[$op])): ?>
                                 <input type="checkbox"
                                        class="configKey acl-checkbox"
                                        data-l1key="acl_<?php echo $domain; ?>_<?php echo $op; ?>"
@@ -246,11 +252,13 @@ $('#bt_copyApiKey').on('click', function () {
 var ACL_MODE_OPS = {
     read_execute:          ['read', 'execution'],
     read_execute_describe: ['read', 'execution', 'set_description'],
-    full:                  ['read', 'execution', 'set_description', 'create', 'update', 'delete']
+    full:                  ['read', 'execution', 'set_description', 'create', 'update', 'delete'],
+    full_admin:            ['read', 'execution', 'set_description', 'create', 'update', 'delete']
 };
 
 function applyAclMode(mode) {
-    var isCustom = (mode === 'custom');
+    var isCustom    = (mode === 'custom');
+    var isFullAdmin = (mode === 'full_admin');
     $('#acl_table_wrapper').css({
         'opacity':        isCustom ? '1'    : '0.5',
         'pointer-events': isCustom ? 'auto' : 'none'
@@ -258,7 +266,8 @@ function applyAclMode(mode) {
     if (!isCustom) {
         var ops = ACL_MODE_OPS[mode] || [];
         $('.acl-checkbox').each(function () {
-            $(this).prop('checked', ops.indexOf($(this).data('op')) !== -1);
+            var isAdminRow = $(this).closest('tr').data('admin') === 1;
+            $(this).prop('checked', (!isAdminRow || isFullAdmin) && ops.indexOf($(this).data('op')) !== -1);
         });
     }
 }
