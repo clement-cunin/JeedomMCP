@@ -46,6 +46,7 @@ Discovery tool. Lists all enabled Jeedom equipment with their current state and 
 |-----------|------|----------|-------------|
 | `categories` | string[] | no | Filter by category. Valid values: `heating`, `security`, `energy`, `light`, `opening`, `automatism`, `multimedia`, `default` |
 | `room_ids` | int[] | no | Filter by room — returns only equipment whose `room_id` is in this list |
+| `include_hidden` | bool | no | Include devices hidden in the Jeedom UI (`is_visible=false`). Default: `false` |
 | `include_state` | bool | no | Include the `state` map per device (default: `true`) |
 | `include_actions` | bool | no | Include the `actions` array per device (default: `true`) |
 | `limit` | int | no | Maximum number of items to return (default: 50). Use 0 for no limit. |
