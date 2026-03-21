@@ -9,7 +9,8 @@ $acl_matrix = [
     'devices'    => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => false, 'update' => false, 'delete' => false],
     'rooms'      => ['read' => true, 'execution' => false, 'set_description' => true, 'create' => true, 'update' => true, 'delete' => true],
     'scenarios'  => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => true, 'update' => true, 'delete' => true],
-    'admin_logs' => ['read' => true, 'execution' => false, 'set_description' => false, 'create' => false, 'update' => false, 'delete' => false],
+    'admin_plugins' => ['read' => true, 'execution' => false, 'set_description' => false, 'create' => true,  'update' => true, 'delete' => true],
+    'admin_logs'    => ['read' => true, 'execution' => false, 'set_description' => false, 'create' => false, 'update' => false, 'delete' => false],
 ];
 
 // Default preset: "Read & Execute"
@@ -39,7 +40,8 @@ $acl_domain_labels = [
     'devices'    => '{{Devices}}',
     'rooms'      => '{{Rooms}}',
     'scenarios'  => '{{Scenarios}}',
-    'admin_logs' => '{{Admin — Logs}}',
+    'admin_plugins' => '{{Admin — Plugins}}',
+    'admin_logs'    => '{{Admin — Logs}}',
 ];
 $acl_op_labels = [
     'read'            => '{{View / List}}',
@@ -71,6 +73,12 @@ $acl_tools = [
         'create'          => ['scenario_create'],
         'update'          => ['scenario_update', 'scenario_set_actions'],
         'delete'          => ['scenario_delete'],
+    ],
+    'admin_plugins' => [
+        'read'   => ['plugins_list', 'plugin_market_list'],
+        'create' => ['plugin_install'],
+        'update' => ['plugin_set_active'],
+        'delete' => ['plugin_uninstall'],
     ],
     'admin_logs' => [
         'read' => ['logs_list', 'log_read'],

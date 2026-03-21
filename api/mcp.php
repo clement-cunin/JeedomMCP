@@ -373,6 +373,62 @@ function mcp_get_tools(): array {
             ],
         ],
         [
+            'name'        => 'plugins_list',
+            'description' => 'List all installed Jeedom plugins with their version and active state.',
+            'inputSchema' => ['type' => 'object', 'properties' => new stdClass(), 'required' => []],
+        ],
+        [
+            'name'        => 'plugin_market_list',
+            'description' => 'Search plugins on the Jeedom Market. Returns a paginated list of available plugins.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'search'        => ['type' => 'string',  'description' => 'Filter by plugin name.'],
+                    'category'      => ['type' => 'string',  'description' => 'Filter by category (e.g. automation, security, energy).'],
+                    'certification' => ['type' => 'string',  'description' => 'Filter by certification level.', 'enum' => ['Officiel', 'Conseillé', 'Premium', 'Partenaire', 'Legacy']],
+                    'cost'          => ['type' => 'string',  'description' => 'Filter by cost.', 'enum' => ['free', 'paying']],
+                    'limit'         => ['type' => 'integer', 'description' => 'Maximum number of results (default 20). Use 0 for no limit.'],
+                    'offset'        => ['type' => 'integer', 'description' => 'Number of results to skip (default 0).'],
+                ],
+                'required' => [],
+            ],
+        ],
+        [
+            'name'        => 'plugin_install',
+            'description' => 'Install or update a plugin from the Jeedom Market.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'plugin_id' => ['type' => 'string', 'description' => 'Plugin identifier on the Jeedom Market.'],
+                    'version'   => ['type' => 'string', 'description' => 'Version channel to install: stable (default) or beta.', 'enum' => ['stable', 'beta']],
+                ],
+                'required' => ['plugin_id'],
+            ],
+        ],
+        [
+            'name'        => 'plugin_uninstall',
+            'description' => 'Uninstall a Jeedom plugin. Removes all associated devices, configuration and plugin files. This action is irreversible.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'plugin_id' => ['type' => 'string', 'description' => 'Plugin identifier to uninstall.'],
+                ],
+                'required' => ['plugin_id'],
+            ],
+        ],
+        [
+            'name'        => 'plugin_set_active',
+            'description' => 'Enable or disable an installed Jeedom plugin.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'plugin_id' => ['type' => 'string',  'description' => 'Plugin identifier.'],
+                    'active'    => ['type' => 'boolean', 'description' => 'true to enable, false to disable.'],
+                ],
+                'required' => ['plugin_id', 'active'],
+            ],
+        ],
+        [
             'name'        => 'logs_list',
             'description' => 'List available Jeedom log files with their size and last modification date.',
             'inputSchema' => ['type' => 'object', 'properties' => new stdClass(), 'required' => []],
@@ -436,6 +492,11 @@ function mcp_call_tool(string $name, array $args): array {
             case 'scenario_set_description': return tool_result(tool_scenario_set_description((int)($args['scenario_id'] ?? 0), (string)($args['description'] ?? '')));
             case 'scenario_update':     return tool_result(tool_scenario_update($args));
             case 'scenario_create':     return tool_result(tool_scenario_create($args));
+            case 'plugins_list':        return tool_result(tool_plugins_list());
+            case 'plugin_market_list': return tool_result(tool_plugin_market_list($args['search'] ?? null, $args['category'] ?? null, $args['certification'] ?? null, $args['cost'] ?? null, intval($args['limit'] ?? 20), intval($args['offset'] ?? 0)));
+            case 'plugin_install':      return tool_result(tool_plugin_install((string)($args['plugin_id'] ?? ''), (string)($args['version'] ?? 'stable')));
+            case 'plugin_uninstall':    return tool_result(tool_plugin_uninstall((string)($args['plugin_id'] ?? '')));
+            case 'plugin_set_active':   return tool_result(tool_plugin_set_active((string)($args['plugin_id'] ?? ''), (bool)($args['active'] ?? true)));
             case 'logs_list':           return tool_result(tool_logs_list());
             case 'log_read':            return tool_result(tool_log_read((string)($args['log'] ?? ''), intval($args['lines'] ?? 100), intval($args['offset'] ?? 0), $args['min_level'] ?? null, $args['search'] ?? null));
             default:                    return tool_error('Unknown tool: ' . $name);
@@ -538,8 +599,13 @@ function tool_acl_list(): array {
         'scenario_update'          => ['scenarios',  'update'],
         'scenario_set_actions'     => ['scenarios',  'update'],
         'scenario_delete'          => ['scenarios',  'delete'],
-        'logs_list'                => ['admin_logs', 'read'],
-        'log_read'                 => ['admin_logs', 'read'],
+        'plugins_list'             => ['admin_plugins', 'read'],
+        'plugin_market_list'       => ['admin_plugins', 'read'],
+        'plugin_install'           => ['admin_plugins', 'create'],
+        'plugin_uninstall'         => ['admin_plugins', 'delete'],
+        'plugin_set_active'        => ['admin_plugins', 'update'],
+        'logs_list'                => ['admin_logs',    'read'],
+        'log_read'                 => ['admin_logs',    'read'],
     ];
 
     $authorized = ['acl_list']; // always accessible
@@ -868,6 +934,108 @@ function tool_scenario_create(array $args): array {
         return ['error' => 'Scenario creation failed: no ID returned'];
     }
     return fmt_scenario($s);
+}
+
+// ---------------------------------------------------------------------------
+// Admin — Plugins
+// ---------------------------------------------------------------------------
+
+function tool_plugins_list(): array {
+    acl_check('admin_plugins', 'read');
+    $result = [];
+    foreach (plugin::listPlugin() as $p) {
+        $u       = update::byLogicalId($p->getId());
+        $version = is_object($u) ? ($u->getLocalVersion() ?: null) : null;
+        $item = [
+            'id'        => $p->getId(),
+            'name'      => $p->getName() ?? '',
+            'version'   => $version,
+            'is_active' => $p->isActive() == 1,
+        ];
+        if ($p->getDescription()) $item['description'] = strip_tags($p->getDescription());
+        $result[] = $item;
+    }
+    return $result;
+}
+
+function tool_plugin_market_list(?string $search = null, ?string $category = null, ?string $certification = null, ?string $cost = null, int $limit = 20, int $offset = 0): array {
+    acl_check('admin_plugins', 'read');
+    $filter = [
+        'type'          => 'plugin',
+        'status'        => 'stable',
+        'name'          => $search ?: null,
+        'categorie'     => $category ?: null,
+        'certification' => $certification ?: null,
+        'cost'          => $cost ?: null,
+    ];
+    $markets = repo_market::byFilter($filter);
+    $total   = count($markets);
+    $page    = $limit > 0 ? array_slice($markets, $offset, $limit) : array_slice($markets, $offset);
+    $items   = [];
+    foreach ($page as $m) {
+        $installed = is_object(update::byLogicalId($m->getLogicalId()));
+        $item = [
+            'id'            => $m->getLogicalId(),
+            'name'          => $m->getName(),
+            'author'        => $m->getAuthor(),
+            'category'      => $m->getCategorie() ?: null,
+            'is_free'       => $m->getCost() == 0,
+            'cost'          => $m->getCost() > 0 ? floatval($m->getCost()) : null,
+            'rating'        => $m->getRating('average'),
+            'installed'     => $installed,
+        ];
+        if ($m->getCertification()) $item['certification'] = $m->getCertification();
+        if ($m->getDescription())   $item['description']   = strip_tags($m->getDescription());
+        $items[] = $item;
+    }
+    return ['total' => $total, 'offset' => $offset, 'limit' => $limit, 'items' => $items];
+}
+
+function tool_plugin_install(string $plugin_id, string $version = 'stable'): array {
+    acl_check('admin_plugins', 'create');
+    if ($plugin_id === '') throw new Exception('plugin_id is required');
+    if (!in_array($version, ['stable', 'beta'], true)) $version = 'stable';
+    $u = update::byLogicalId($plugin_id);
+    if (!is_object($u)) {
+        $u = new update();
+        $u->setLogicalId($plugin_id);
+        $u->setType('plugin');
+        $u->setSource('market');
+        $u->save();
+    }
+    $u->setConfiguration('version', $version);
+    $u->save();
+    $u->doUpdate();
+    $plugin = plugin::byId($plugin_id);
+    return [
+        'success'   => true,
+        'plugin_id' => $plugin_id,
+        'channel'   => $version,
+        'version'   => is_object($plugin) ? ($plugin->getVersion() ?: null) : null,
+    ];
+}
+
+function tool_plugin_uninstall(string $plugin_id): array {
+    acl_check('admin_plugins', 'delete');
+    if ($plugin_id === '') throw new Exception('plugin_id is required');
+    $u = update::byLogicalId($plugin_id);
+    if (!is_object($u)) throw new Exception('Plugin not found: ' . $plugin_id);
+    if ($u->getType() === 'core') throw new Exception('Cannot uninstall the Jeedom core');
+    $u->deleteObjet();
+    return ['success' => true, 'plugin_id' => $plugin_id];
+}
+
+function tool_plugin_set_active(string $plugin_id, bool $active): array {
+    acl_check('admin_plugins', 'update');
+    if ($plugin_id === '') throw new Exception('plugin_id is required');
+    $plugin = plugin::byId($plugin_id);
+    if (!is_object($plugin)) throw new Exception('Plugin not found: ' . $plugin_id);
+    $plugin->setIsEnable($active ? 1 : 0);
+    return [
+        'success'   => true,
+        'plugin_id' => $plugin_id,
+        'active'    => $active,
+    ];
 }
 
 // ---------------------------------------------------------------------------

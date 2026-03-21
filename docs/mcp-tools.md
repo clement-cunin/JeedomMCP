@@ -551,6 +551,126 @@ Admin tools require ACL mode **Full access + Admin** (`full_admin`) or Custom mo
 
 ---
 
+## `plugins_list`
+
+Lists all installed Jeedom plugins with their version and active state.
+
+**Parameters**: none
+
+**Returns**:
+
+```json
+[
+  { "id": "zwave",     "name": "Z-Wave",     "version": "4.2.1", "is_active": true },
+  { "id": "JeedomMCP", "name": "JeedomMCP", "version": "0.1.0", "is_active": true, "description": "MCP server" }
+]
+```
+
+---
+
+## `plugin_market_list`
+
+Search plugins available on the Jeedom Market. Returns a paginated list.
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `search` | string | no | Filter by plugin name |
+| `category` | string | no | Filter by category |
+| `certification` | string | no | `Officiel`, `Conseillé`, `Premium`, `Partenaire`, or `Legacy` |
+| `cost` | string | no | `free` or `paying` |
+| `limit` | int | no | Maximum results (default: 20). Use 0 for no limit. |
+| `offset` | int | no | Number of results to skip (default: 0) |
+
+**Returns**: paginated object
+
+```json
+{
+  "total": 245,
+  "offset": 0,
+  "limit": 20,
+  "items": [
+    {
+      "id": "zwave",
+      "name": "Z-Wave",
+      "author": "Jeedom SAS",
+      "category": "automation",
+      "is_free": false,
+      "cost": 6.00,
+      "rating": 4.2,
+      "installed": true,
+      "certification": "Officiel",
+      "description": "Plugin to control Z-Wave devices."
+    }
+  ]
+}
+```
+
+---
+
+## `plugin_install`
+
+Installs or updates a plugin from the Jeedom Market.
+
+> **Warning**: downloads and executes external code on the server — requires `admin_plugins.create` permission.
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `plugin_id` | string | yes | Plugin identifier on the Jeedom Market |
+| `version` | string | no | Version channel: `stable` (default) or `beta` |
+
+**Returns**:
+
+```json
+{ "success": true, "plugin_id": "zwave", "channel": "stable", "version": "4.2.1" }
+```
+
+---
+
+## `plugin_uninstall`
+
+Uninstalls a Jeedom plugin. Removes all associated devices, configuration and plugin files. **This action is irreversible.**
+
+> **ACL**: `admin_plugins.delete`
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `plugin_id` | string | yes | Plugin identifier to uninstall |
+
+**Returns**:
+
+```json
+{ "success": true, "plugin_id": "zwave" }
+```
+
+---
+
+## `plugin_set_active`
+
+Enables or disables an installed Jeedom plugin.
+
+> **ACL**: `admin_plugins.update`
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `plugin_id` | string | yes | Plugin identifier |
+| `active` | boolean | yes | `true` to enable, `false` to disable |
+
+**Returns**:
+
+```json
+{ "success": true, "plugin_id": "zwave", "active": false }
+```
+
+---
+
 ## `logs_list`
 
 Lists available Jeedom log files with their size, last modification date, and highest severity level found.
