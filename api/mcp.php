@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * JeedomMCP - PHP MCP Server (streamable-http transport)
  *
@@ -406,6 +406,54 @@ function mcp_get_tools(): array {
             ],
         ],
         [
+            'name'        => 'plugin_get_config',
+            'description' => 'Get detailed configuration for an installed plugin: log level, daemon state and auto-restart setting.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'plugin_id' => ['type' => 'string', 'description' => 'Plugin identifier.'],
+                ],
+                'required' => ['plugin_id'],
+            ],
+        ],
+        [
+            'name'        => 'plugin_set_config',
+            'description' => 'Update plugin settings: log level and/or daemon auto-restart mode.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'plugin_id'          => ['type' => 'string',  'description' => 'Plugin identifier.'],
+                    'log_level'              => ['type' => 'string',  'description' => 'Log verbosity level.', 'enum' => ['debug', 'info', 'notice', 'warning', 'error', 'critical', 'default']],
+                    'daemon_auto_restart'    => ['type' => 'boolean', 'description' => 'Enable or disable automatic daemon restart.'],
+                    'dependency_auto_install' => ['type' => 'boolean', 'description' => 'Enable or disable automatic dependency installation.'],
+                ],
+                'required' => ['plugin_id'],
+            ],
+        ],
+        [
+            'name'        => 'plugin_dependency_install',
+            'description' => 'Trigger dependency installation for a plugin. Installation runs in background; use plugin_get_config to monitor progress.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'plugin_id' => ['type' => 'string', 'description' => 'Plugin identifier.'],
+                ],
+                'required' => ['plugin_id'],
+            ],
+        ],
+        [
+            'name'        => 'plugin_daemon_action',
+            'description' => 'Start, stop or restart a plugin daemon.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'plugin_id' => ['type' => 'string', 'description' => 'Plugin identifier.'],
+                    'action'    => ['type' => 'string', 'description' => 'Action to perform.', 'enum' => ['start', 'stop', 'restart']],
+                ],
+                'required' => ['plugin_id', 'action'],
+            ],
+        ],
+        [
             'name'        => 'plugin_uninstall',
             'description' => 'Uninstall a Jeedom plugin. Removes all associated devices, configuration and plugin files. This action is irreversible.',
             'inputSchema' => [
@@ -493,10 +541,14 @@ function mcp_call_tool(string $name, array $args): array {
             case 'scenario_update':     return tool_result(tool_scenario_update($args));
             case 'scenario_create':     return tool_result(tool_scenario_create($args));
             case 'plugins_list':        return tool_result(tool_plugins_list());
+            case 'plugin_get_config':   return tool_result(tool_plugin_get_config((string)($args['plugin_id'] ?? '')));
+            case 'plugin_set_config':   return tool_result(tool_plugin_set_config((string)($args['plugin_id'] ?? ''), $args['log_level'] ?? null, isset($args['daemon_auto_restart']) ? (bool)$args['daemon_auto_restart'] : null, isset($args['dependency_auto_install']) ? (bool)$args['dependency_auto_install'] : null));
             case 'plugin_market_list': return tool_result(tool_plugin_market_list($args['search'] ?? null, $args['category'] ?? null, $args['certification'] ?? null, $args['cost'] ?? null, intval($args['limit'] ?? 20), intval($args['offset'] ?? 0)));
             case 'plugin_install':      return tool_result(tool_plugin_install((string)($args['plugin_id'] ?? ''), (string)($args['version'] ?? 'stable')));
             case 'plugin_uninstall':    return tool_result(tool_plugin_uninstall((string)($args['plugin_id'] ?? '')));
             case 'plugin_set_active':   return tool_result(tool_plugin_set_active((string)($args['plugin_id'] ?? ''), (bool)($args['active'] ?? true)));
+            case 'plugin_dependency_install': return tool_result(tool_plugin_dependency_install((string)($args['plugin_id'] ?? '')));
+            case 'plugin_daemon_action': return tool_result(tool_plugin_daemon_action((string)($args['plugin_id'] ?? ''), (string)($args['action'] ?? '')));
             case 'logs_list':           return tool_result(tool_logs_list());
             case 'log_read':            return tool_result(tool_log_read((string)($args['log'] ?? ''), intval($args['lines'] ?? 100), intval($args['offset'] ?? 0), $args['min_level'] ?? null, $args['search'] ?? null));
             default:                    return tool_error('Unknown tool: ' . $name);
@@ -600,10 +652,14 @@ function tool_acl_list(): array {
         'scenario_set_actions'     => ['scenarios',  'update'],
         'scenario_delete'          => ['scenarios',  'delete'],
         'plugins_list'             => ['admin_plugins', 'read'],
+        'plugin_get_config'        => ['admin_plugins', 'read'],
         'plugin_market_list'       => ['admin_plugins', 'read'],
         'plugin_install'           => ['admin_plugins', 'create'],
         'plugin_uninstall'         => ['admin_plugins', 'delete'],
         'plugin_set_active'        => ['admin_plugins', 'update'],
+        'plugin_set_config'        => ['admin_plugins', 'update'],
+        'plugin_dependency_install' => ['admin_plugins', 'execution'],
+        'plugin_daemon_action'     => ['admin_plugins', 'execution'],
         'logs_list'                => ['admin_logs',    'read'],
         'log_read'                 => ['admin_logs',    'read'],
     ];
@@ -991,6 +1047,90 @@ function tool_plugin_market_list(?string $search = null, ?string $category = nul
     return ['total' => $total, 'offset' => $offset, 'limit' => $limit, 'items' => $items];
 }
 
+function plugin_log_level_name(string $plugin_id): string {
+    $cfg = config::byKey('log::level::' . $plugin_id, 'core');
+    if (!is_array($cfg) || !empty($cfg['default'])) return 'default';
+    $map = [100 => 'debug', 200 => 'info', 250 => 'notice', 300 => 'warning', 400 => 'error', 500 => 'critical'];
+    foreach ($map as $num => $name) {
+        if (!empty($cfg[$num])) return $name;
+    }
+    return 'default';
+}
+
+function tool_plugin_get_config(string $plugin_id): array {
+    acl_check('admin_plugins', 'read');
+    if ($plugin_id === '') throw new Exception('plugin_id is required');
+    $plugin = plugin::byId($plugin_id);
+    if (!is_object($plugin)) throw new Exception('Plugin not found: ' . $plugin_id);
+    $upd = update::byLogicalId($plugin_id);
+    $result = [
+        'id'          => $plugin->getId(),
+        'name'        => $plugin->getName(),
+        'version'     => is_object($upd) ? ($upd->getLocalVersion() ?: null) : null,
+        'category'    => $plugin->getCategory() ?: null,
+        'active'      => (bool)$plugin->isActive(),
+        'log_level'   => plugin_log_level_name($plugin_id),
+    ];
+    if ($plugin->getHasDependency()) {
+        $dep = $plugin->dependancy_info();
+        $dependency = [
+            'state'        => $dep['state'] ?? 'nok',
+            'auto_install' => (bool)$dep['auto'],
+            'last_launch'  => $dep['last_launch'] ?? null,
+        ];
+        if (($dep['state'] ?? '') === 'in_progress') {
+            $dependency['progression'] = isset($dep['progression']) ? (int)$dep['progression'] : 0;
+            $dependency['duration']    = isset($dep['duration'])    ? (int)$dep['duration']    : 0;
+        }
+        $result['dependency'] = $dependency;
+    }
+    if ($plugin->getHasOwnDeamon()) {
+        $daemon = $plugin->deamon_info();
+        $result['daemon'] = [
+            'state'        => $daemon['state'] ?? 'nok',
+            'auto_restart' => (bool)$daemon['auto'],
+            'launchable'   => ($daemon['launchable'] ?? 'nok') === 'ok',
+            'last_launch'  => $daemon['last_launch'] ?? null,
+        ];
+        if (!empty($daemon['launchable_message'])) {
+            $result['daemon']['message'] = $daemon['launchable_message'];
+        }
+    }
+    return $result;
+}
+
+function tool_plugin_set_config(string $plugin_id, ?string $log_level, ?bool $daemon_auto_restart, ?bool $dependency_auto_install = null): array {
+    acl_check('admin_plugins', 'update');
+    if ($plugin_id === '') throw new Exception('plugin_id is required');
+    $plugin = plugin::byId($plugin_id);
+    if (!is_object($plugin)) throw new Exception('Plugin not found: ' . $plugin_id);
+    $changed = [];
+    if ($log_level !== null) {
+        $valid = ['debug' => 100, 'info' => 200, 'notice' => 250, 'warning' => 300, 'error' => 400, 'critical' => 500];
+        if ($log_level === 'default') {
+            config::save('log::level::' . $plugin_id, ['default' => 1], 'core');
+        } elseif (isset($valid[$log_level])) {
+            $cfg = ['default' => 0];
+            foreach ($valid as $n => $num) { $cfg[$num] = ($n === $log_level) ? 1 : 0; }
+            config::save('log::level::' . $plugin_id, $cfg, 'core');
+        } else {
+            throw new Exception('Invalid log_level: ' . $log_level);
+        }
+        $changed['log_level'] = $log_level;
+    }
+    if ($daemon_auto_restart !== null) {
+        if (!$plugin->getHasOwnDeamon()) throw new Exception('Plugin ' . $plugin_id . ' has no daemon');
+        $plugin->deamon_changeAutoMode($daemon_auto_restart ? 1 : 0);
+        $changed['daemon_auto_restart'] = $daemon_auto_restart;
+    }
+    if ($dependency_auto_install !== null) {
+        if (!$plugin->getHasDependency()) throw new Exception('Plugin ' . $plugin_id . ' has no dependencies');
+        $plugin->dependancy_changeAutoMode($dependency_auto_install ? 1 : 0);
+        $changed['dependency_auto_install'] = $dependency_auto_install;
+    }
+    return array_merge(['success' => true, 'plugin_id' => $plugin_id], $changed);
+}
+
 function tool_plugin_install(string $plugin_id, string $version = 'stable'): array {
     acl_check('admin_plugins', 'create');
     if ($plugin_id === '') throw new Exception('plugin_id is required');
@@ -1011,7 +1151,7 @@ function tool_plugin_install(string $plugin_id, string $version = 'stable'): arr
         'success'   => true,
         'plugin_id' => $plugin_id,
         'channel'   => $version,
-        'version'   => is_object($plugin) ? ($plugin->getVersion() ?: null) : null,
+        'version'   => $u->getLocalVersion() ?: null,
     ];
 }
 
@@ -1023,6 +1163,37 @@ function tool_plugin_uninstall(string $plugin_id): array {
     if ($u->getType() === 'core') throw new Exception('Cannot uninstall the Jeedom core');
     $u->deleteObjet();
     return ['success' => true, 'plugin_id' => $plugin_id];
+}
+
+function tool_plugin_dependency_install(string $plugin_id): array {
+    acl_check('admin_plugins', 'execution');
+    if ($plugin_id === '') throw new Exception('plugin_id is required');
+    $plugin = plugin::byId($plugin_id);
+    if (!is_object($plugin)) throw new Exception('Plugin not found: ' . $plugin_id);
+    if (!$plugin->getHasDependency()) throw new Exception('Plugin ' . $plugin_id . ' has no dependencies');
+    $plugin->dependancy_install(true);
+    return ['success' => true, 'plugin_id' => $plugin_id, 'state' => 'in_progress'];
+}
+
+function tool_plugin_daemon_action(string $plugin_id, string $action): array {
+    acl_check('admin_plugins', 'execution');
+    if ($plugin_id === '') throw new Exception('plugin_id is required');
+    if (!in_array($action, ['start', 'stop', 'restart'], true)) throw new Exception('action must be start, stop or restart');
+    $plugin = plugin::byId($plugin_id);
+    if (!is_object($plugin)) throw new Exception('Plugin not found: ' . $plugin_id);
+    if (!$plugin->getHasOwnDeamon()) throw new Exception('Plugin ' . $plugin_id . ' has no daemon');
+    if ($action === 'stop') {
+        $plugin->deamon_stop();
+    } else {
+        $plugin->deamon_start($action === 'restart');
+    }
+    $daemon = $plugin->deamon_info();
+    return [
+        'success'   => true,
+        'plugin_id' => $plugin_id,
+        'action'    => $action,
+        'state'     => $daemon['state'] ?? 'nok',
+    ];
 }
 
 function tool_plugin_set_active(string $plugin_id, bool $active): array {

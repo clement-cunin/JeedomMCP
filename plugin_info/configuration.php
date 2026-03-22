@@ -9,7 +9,7 @@ $acl_matrix = [
     'devices'    => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => false, 'update' => false, 'delete' => false],
     'rooms'      => ['read' => true, 'execution' => false, 'set_description' => true, 'create' => true, 'update' => true, 'delete' => true],
     'scenarios'  => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => true, 'update' => true, 'delete' => true],
-    'admin_plugins' => ['read' => true, 'execution' => false, 'set_description' => false, 'create' => true,  'update' => true, 'delete' => true],
+    'admin_plugins' => ['read' => true, 'execution' => true, 'set_description' => false, 'create' => true,  'update' => true, 'delete' => true],
     'admin_logs'    => ['read' => true, 'execution' => false, 'set_description' => false, 'create' => false, 'update' => false, 'delete' => false],
 ];
 
@@ -75,9 +75,10 @@ $acl_tools = [
         'delete'          => ['scenario_delete'],
     ],
     'admin_plugins' => [
-        'read'   => ['plugins_list', 'plugin_market_list'],
+        'read'   => ['plugins_list', 'plugin_get_config', 'plugin_market_list'],
         'create' => ['plugin_install'],
-        'update' => ['plugin_set_active'],
+        'execution' => ['plugin_dependency_install', 'plugin_daemon_action'],
+        'update' => ['plugin_set_active', 'plugin_set_config'],
         'delete' => ['plugin_uninstall'],
     ],
     'admin_logs' => [
