@@ -14,6 +14,29 @@ require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
 ob_clean();
 
 // ---------------------------------------------------------------------------
+// Admin actions (Jeedom session auth, not API key)
+// ---------------------------------------------------------------------------
+
+if (isset($_GET['action'])) {
+    ob_end_clean();
+    header('Content-Type: application/json; charset=utf-8');
+    if (!isConnect('admin')) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Unauthorized']);
+        exit;
+    }
+    if ($_GET['action'] === 'generateApiKey') {
+        $key = bin2hex(random_bytes(24));
+        config::save('mcpApiKey', $key, 'jeedomMCP');
+        echo json_encode(['success' => true, 'key' => $key]);
+        exit;
+    }
+    http_response_code(400);
+    echo json_encode(['error' => 'Unknown action']);
+    exit;
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

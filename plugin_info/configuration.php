@@ -228,15 +228,14 @@ $('#bt_regenerateApiKey').on('click', function () {
         if (!result) return;
         $.ajax({
             type: 'POST',
-            url: 'plugins/jeedomMCP/core/ajax/jeedomMCP.ajax.php',
-            data: { action: 'generateApiKey' },
+            url: 'plugins/jeedomMCP/api/mcp.php?action=generateApiKey',
             dataType: 'json',
             success: function (data) {
-                if (data.state !== 'ok') {
-                    $.fn.showAlert({ message: data.result, level: 'danger' });
+                if (!data.success) {
+                    $.fn.showAlert({ message: data.error || '{{Error}}', level: 'danger' });
                     return;
                 }
-                $('#inp_mcpApiKey').val(data.result);
+                $('#inp_mcpApiKey').val(data.key);
                 updateMcpJsonPreview();
                 $.fn.showAlert({ message: '{{API key regenerated successfully.}}', level: 'success' });
             },
