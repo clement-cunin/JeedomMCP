@@ -234,17 +234,26 @@ function mcp_get_tools(): array {
         ],
         [
             'name'        => 'devices_states',
-            'description' => 'Bulk refresh the state of a specific set of equipment. Returns only {id, state} per device — use devices_list for full discovery.',
+            'description' => 'Bulk refresh the state of equipment. Provide equipment_ids for specific devices, or use categories/room_ids to match devices without prior discovery. Returns {id, state} per device.',
             'inputSchema' => [
                 'type'       => 'object',
                 'properties' => [
                     'equipment_ids' => [
                         'type'        => 'array',
                         'items'       => ['type' => 'integer'],
-                        'description' => 'List of equipment IDs to refresh.',
+                        'description' => 'List of specific equipment IDs to refresh.',
+                    ],
+                    'categories' => [
+                        'type'        => 'array',
+                        'items'       => ['type' => 'string', 'enum' => ['heating', 'security', 'energy', 'light', 'opening', 'automatism', 'multimedia', 'default']],
+                        'description' => 'Filter by category — returns all devices matching any of the given categories.',
+                    ],
+                    'room_ids' => [
+                        'type'        => 'array',
+                        'items'       => ['type' => 'integer'],
+                        'description' => 'Filter by room — returns all devices in any of the given rooms.',
                     ],
                 ],
-                'required' => ['equipment_ids'],
             ],
         ],
         [
@@ -576,7 +585,7 @@ function mcp_call_tool(string $name, array $args): array {
             case 'devices_list':        return tool_result(tool_devices_list($args['categories'] ?? null, $args['room_ids'] ?? null, intval($args['limit'] ?? 50), intval($args['offset'] ?? 0), isset($args['include_state']) ? (bool)$args['include_state'] : true, isset($args['include_actions']) ? (bool)$args['include_actions'] : true, isset($args['include_hidden']) ? (bool)$args['include_hidden'] : false));
             case 'device_set_description': return tool_result(tool_device_set_description((int)($args['equipment_id'] ?? 0), (string)($args['description'] ?? '')));
             case 'device_update':       return tool_result(tool_device_update((int)($args['equipment_id'] ?? 0), $args));
-            case 'devices_states':      return tool_result(tool_devices_states($args['equipment_ids'] ?? []));
+            case 'devices_states':      return tool_result(tool_devices_states($args['equipment_ids'] ?? null, $args['categories'] ?? null, $args['room_ids'] ?? null));
             case 'command_execute':     return tool_result(tool_command_execute($args['commands'] ?? []));
             case 'rooms_list':          return tool_result(tool_rooms_list(intval($args['limit'] ?? 50), intval($args['offset'] ?? 0)));
             case 'room_set_description': return tool_result(tool_room_set_description((int)($args['room_id'] ?? 0), (string)($args['description'] ?? '')));
@@ -810,31 +819,39 @@ function tool_device_update(int $equipment_id, array $args): array {
     return fmt_equipment($eq);
 }
 
-function tool_devices_states(array $equipment_ids): array {
+function tool_devices_states(?array $equipment_ids, ?array $categories, ?array $room_ids): array {
     acl_check('devices', 'read');
-    if (empty($equipment_ids)) throw new Exception('equipment_ids is required');
+    if ($equipment_ids === null && $categories === null && $room_ids === null) {
+        throw new Exception('Provide at least one of: equipment_ids, categories, room_ids');
+    }
 
-    $found = [];
     $eq_map = [];
     foreach (eqLogic::all() as $eq) {
-        if (in_array((int)$eq->getId(), $equipment_ids)) {
-            $found[]                  = (int)$eq->getId();
-            $eq_map[$eq->getId()]     = $eq;
+        $id = (int)$eq->getId();
+        if ($equipment_ids !== null && !in_array($id, $equipment_ids, true)) continue;
+        if ($categories !== null) {
+            $match = false;
+            foreach ($categories as $cat) { if ($eq->getCategory($cat)) { $match = true; break; } }
+            if (!$match) continue;
         }
+        if ($room_ids !== null && !in_array((int)$eq->getObject_id(), $room_ids, true)) continue;
+        $eq_map[$id] = $eq;
     }
-    $missing = array_diff($equipment_ids, $found);
-    if (!empty($missing)) throw new Exception('Equipment not found: ' . implode(', ', $missing));
+
+    if ($equipment_ids !== null) {
+        $missing = array_diff($equipment_ids, array_keys($eq_map));
+        if (!empty($missing)) throw new Exception('Equipment not found: ' . implode(', ', $missing));
+    }
 
     $commands_by_eq = [];
     foreach (cmd::all() as $cmd) {
-        $eq_id = $cmd->getEqLogic_id();
+        $eq_id = (int)$cmd->getEqLogic_id();
         if (isset($eq_map[$eq_id])) $commands_by_eq[$eq_id][] = $cmd;
     }
 
     $result = [];
-    foreach ($equipment_ids as $id) {
-        $cmds     = $commands_by_eq[$id] ?? [];
-        $result[] = ['id' => $id, 'state' => fmt_state_map($cmds)];
+    foreach ($eq_map as $id => $eq) {
+        $result[] = ['id' => $id, 'state' => fmt_state_map($commands_by_eq[$id] ?? [])];
     }
     return $result;
 }

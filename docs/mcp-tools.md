@@ -133,15 +133,19 @@ Updates a device's metadata. Only provided fields are modified.
 
 ## `devices_states`
 
-Lightweight bulk refresh tool. Returns only the current state for a specific set of equipment. Use `devices_list` for full discovery (metadata + actions).
+Lightweight bulk refresh tool. Returns only the current state for a set of equipment. Provide `equipment_ids` for specific devices, or use `categories`/`room_ids` to match devices without prior discovery. At least one parameter is required. Use `devices_list` for full discovery (metadata + actions).
 
 **Parameters**:
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `equipment_ids` | int[] | yes | IDs of the equipment to refresh. |
+| `equipment_ids` | int[] | no* | Specific equipment IDs to refresh. |
+| `categories` | string[] | no* | Filter by category — returns all matching devices. Valid: `heating`, `security`, `energy`, `light`, `opening`, `automatism`, `multimedia`, `default` |
+| `room_ids` | int[] | no* | Filter by room — returns all devices in the given rooms. |
 
-**Returns**: array of `{id, state}` in the same order as the input IDs
+*At least one of the three must be provided. Filters are cumulative (AND logic).
+
+**Returns**: array of `{id, state}`
 
 ```json
 [
