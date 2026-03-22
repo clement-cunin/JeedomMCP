@@ -457,7 +457,7 @@ function mcp_get_tools(): array {
         ],
         [
             'name'        => 'plugin_get_config',
-            'description' => 'Get detailed configuration for an installed plugin: log level, daemon state and auto-restart setting.',
+            'description' => 'Get detailed configuration for an installed plugin: log level, daemon state, dependency state, and plugin-specific config keys with their current values (discovered from plugin_info/configuration.php).',
             'inputSchema' => [
                 'type'       => 'object',
                 'properties' => [
@@ -478,6 +478,18 @@ function mcp_get_tools(): array {
                     'dependency_auto_install' => ['type' => 'boolean', 'description' => 'Enable or disable automatic dependency installation.'],
                 ],
                 'required' => ['plugin_id'],
+            ],
+        ],
+        [
+            'name'        => 'plugin_set_plugin_config',
+            'description' => 'Set plugin-specific configuration values (e.g. Meross login/password, API keys). Use plugin_get_config first to discover available keys.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'plugin_id' => ['type' => 'string', 'description' => 'Plugin identifier.'],
+                    'config'    => ['type' => 'object', 'description' => 'Key/value pairs to save. Keys are validated against those declared in the plugin configuration page.'],
+                ],
+                'required' => ['plugin_id', 'config'],
             ],
         ],
         [
@@ -593,6 +605,7 @@ function mcp_call_tool(string $name, array $args): array {
             case 'scenario_create':     return tool_result(tool_scenario_create($args));
             case 'plugins_list':        return tool_result(tool_plugins_list());
             case 'plugin_get_config':   return tool_result(tool_plugin_get_config((string)($args['plugin_id'] ?? '')));
+            case 'plugin_set_plugin_config': return tool_result(tool_plugin_set_plugin_config((string)($args['plugin_id'] ?? ''), (array)($args['config'] ?? [])));
             case 'plugin_set_config':   return tool_result(tool_plugin_set_config((string)($args['plugin_id'] ?? ''), $args['log_level'] ?? null, isset($args['daemon_auto_restart']) ? (bool)$args['daemon_auto_restart'] : null, isset($args['dependency_auto_install']) ? (bool)$args['dependency_auto_install'] : null));
             case 'plugin_market_list': return tool_result(tool_plugin_market_list($args['search'] ?? null, $args['category'] ?? null, $args['certification'] ?? null, $args['cost'] ?? null, $args['channel'] ?? 'stable', intval($args['limit'] ?? 20), intval($args['offset'] ?? 0)));
             case 'plugin_install':      return tool_result(tool_plugin_install((string)($args['plugin_id'] ?? ''), (string)($args['version'] ?? 'stable')));
@@ -710,6 +723,7 @@ function tool_acl_list(): array {
         'plugin_uninstall'         => ['admin_plugins', 'delete'],
         'plugin_set_active'        => ['admin_plugins', 'update'],
         'plugin_set_config'        => ['admin_plugins', 'update'],
+        'plugin_set_plugin_config'  => ['admin_plugins', 'update'],
         'plugin_dependency_install' => ['admin_plugins', 'execution'],
         'plugin_daemon_action'     => ['admin_plugins', 'execution'],
         'logs_list'                => ['admin_logs',    'read'],
@@ -1176,6 +1190,22 @@ function tool_plugin_get_config(string $plugin_id): array {
             $result['daemon']['message'] = $daemon['launchable_message'];
         }
     }
+
+    // Discover plugin-level config keys by parsing plugin_info/configuration.php
+    $configFile = dirname(__FILE__) . '/../../../plugins/' . $plugin_id . '/plugin_info/configuration.php';
+    if (file_exists($configFile)) {
+        $html = file_get_contents($configFile);
+        preg_match_all('/data-l1key=["\']([^"\']+)["\']/', $html, $matches);
+        $keys = array_values(array_unique($matches[1]));
+        if (!empty($keys)) {
+            $config = [];
+            foreach ($keys as $key) {
+                $config[$key] = config::byKey($key, $plugin_id, null);
+            }
+            $result['config'] = $config;
+        }
+    }
+
     return $result;
 }
 
@@ -1209,6 +1239,30 @@ function tool_plugin_set_config(string $plugin_id, ?string $log_level, ?bool $da
         $changed['dependency_auto_install'] = $dependency_auto_install;
     }
     return array_merge(['success' => true, 'plugin_id' => $plugin_id], $changed);
+}
+
+function tool_plugin_set_plugin_config(string $plugin_id, array $config): array {
+    acl_check('admin_plugins', 'update');
+    if ($plugin_id === '') throw new Exception('plugin_id is required');
+    $plugin = plugin::byId($plugin_id);
+    if (!is_object($plugin)) throw new Exception('Plugin not found: ' . $plugin_id);
+    if (empty($config)) throw new Exception('config must not be empty');
+
+    // Validate keys against those declared in plugin_info/configuration.php
+    $configFile = dirname(__FILE__) . '/../../../plugins/' . $plugin_id . '/plugin_info/configuration.php';
+    if (file_exists($configFile)) {
+        $html = file_get_contents($configFile);
+        preg_match_all('/data-l1key=["\']([^"\']+)["\']/', $html, $matches);
+        $valid_keys = array_unique($matches[1]);
+        foreach (array_keys($config) as $key) {
+            if (!in_array($key, $valid_keys, true)) throw new Exception("Unknown config key '{$key}' for plugin {$plugin_id}");
+        }
+    }
+
+    foreach ($config as $key => $value) {
+        config::save($key, $value, $plugin_id);
+    }
+    return ['success' => true, 'plugin_id' => $plugin_id, 'updated' => array_keys($config)];
 }
 
 function tool_plugin_install(string $plugin_id, string $version = 'stable'): array {
