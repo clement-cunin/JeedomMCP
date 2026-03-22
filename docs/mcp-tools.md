@@ -745,6 +745,57 @@ Starts, stops or restarts a plugin daemon.
 
 ---
 
+## `plugin_device_schema`
+
+Discovers the configuration fields expected by a plugin for its equipment, by introspecting existing devices of that plugin type. Use this before `plugin_device_create` to know which config keys to pass.
+
+> Requires `devices.read` permission.
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `plugin_id` | string | yes | Plugin logical ID (e.g. `wifilightV2`, `kroomba`) |
+
+**Returns**:
+
+```json
+{
+  "plugin_id": "wifilightV2",
+  "source": "introspection",
+  "note": "Fields discovered from existing devices of this plugin type.",
+  "fields": [
+    { "key": "type", "example_value": "Meross", "type": "string" },
+    { "key": "ip",   "example_value": "192.168.1.42", "type": "string" }
+  ]
+}
+```
+
+`source` is `introspection` when existing devices were found, or `none` when no devices exist yet.
+
+---
+
+## `plugin_device_create`
+
+Creates a new equipment for an installed plugin. Use `plugin_device_schema` first to discover available config keys.
+
+> Requires `devices.create` permission.
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `plugin_id` | string | yes | Plugin logical ID (e.g. `wifilightV2`, `kroomba`) |
+| `name` | string | yes | Display name for the new device |
+| `room_id` | integer | no | Room to assign the device to |
+| `enabled` | boolean | no | Whether the device is enabled (default `true`) |
+| `visible` | boolean | no | Whether the device is visible on the dashboard (default `true`) |
+| `config` | object | no | Plugin-specific configuration key/value pairs |
+
+**Returns**: the created equipment object (same format as `devices_list`).
+
+---
+
 ## `plugin_install`
 
 Installs or updates a plugin from the Jeedom Market.

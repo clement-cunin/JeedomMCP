@@ -10,7 +10,7 @@ config::save('admin_nonce', $adminNonce . '|' . (time() + 300), 'jeedomMCP');
 
 // ACL matrix: domain => [op => has_tool]
 $acl_matrix = [
-    'devices'    => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => false, 'update' => true, 'delete' => false],
+    'devices'    => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => true, 'update' => true, 'delete' => false],
     'rooms'      => ['read' => true, 'execution' => false, 'set_description' => true, 'create' => true, 'update' => true, 'delete' => true],
     'scenarios'  => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => true, 'update' => true, 'delete' => true],
     'admin_plugins' => ['read' => true, 'execution' => true, 'set_description' => false, 'create' => true,  'update' => true, 'delete' => true],

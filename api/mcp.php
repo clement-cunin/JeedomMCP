@@ -556,6 +556,33 @@ function mcp_get_tools(): array {
             ],
         ],
         [
+            'name'        => 'plugin_device_schema',
+            'description' => 'Discover the configuration fields expected by a plugin for its equipment. Returns fields introspected from existing devices of that plugin type. Use this before plugin_device_create to know which config keys to pass.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'plugin_id' => ['type' => 'string', 'description' => 'Plugin logical ID (e.g. wifilightV2, kroomba).'],
+                ],
+                'required' => ['plugin_id'],
+            ],
+        ],
+        [
+            'name'        => 'plugin_device_create',
+            'description' => 'Create a new equipment for an installed plugin. Use plugin_device_schema first to discover available config keys.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'plugin_id'   => ['type' => 'string',  'description' => 'Plugin logical ID (e.g. wifilightV2, kroomba).'],
+                    'name'        => ['type' => 'string',  'description' => 'Display name for the new device.'],
+                    'room_id'     => ['type' => 'integer', 'description' => 'Room to assign the device to (optional).'],
+                    'enabled'     => ['type' => 'boolean', 'description' => 'Whether the device is enabled (default true).'],
+                    'visible'     => ['type' => 'boolean', 'description' => 'Whether the device is visible on the dashboard (default true).'],
+                    'config'      => ['type' => 'object',  'description' => 'Plugin-specific configuration key/value pairs (from plugin_device_schema).'],
+                ],
+                'required' => ['plugin_id', 'name'],
+            ],
+        ],
+        [
             'name'        => 'scenario_create',
             'description' => 'Create a new Jeedom scenario.',
             'inputSchema' => [
@@ -609,6 +636,8 @@ function mcp_call_tool(string $name, array $args): array {
             case 'plugin_set_active':   return tool_result(tool_plugin_set_active((string)($args['plugin_id'] ?? ''), (bool)($args['active'] ?? true)));
             case 'plugin_dependency_install': return tool_result(tool_plugin_dependency_install((string)($args['plugin_id'] ?? '')));
             case 'plugin_daemon_action': return tool_result(tool_plugin_daemon_action((string)($args['plugin_id'] ?? ''), (string)($args['action'] ?? '')));
+            case 'plugin_device_schema': return tool_result(tool_plugin_device_schema((string)($args['plugin_id'] ?? '')));
+            case 'plugin_device_create': return tool_result(tool_plugin_device_create((string)($args['plugin_id'] ?? ''), (string)($args['name'] ?? ''), isset($args['room_id']) ? (int)$args['room_id'] : null, isset($args['enabled']) ? (bool)$args['enabled'] : true, isset($args['visible']) ? (bool)$args['visible'] : true, isset($args['config']) ? (array)$args['config'] : []));
             case 'logs_list':           return tool_result(tool_logs_list());
             case 'log_read':            return tool_result(tool_log_read((string)($args['log'] ?? ''), intval($args['lines'] ?? 100), intval($args['offset'] ?? 0), $args['min_level'] ?? null, $args['search'] ?? null));
             default:                    return tool_error('Unknown tool: ' . $name);
@@ -721,6 +750,8 @@ function tool_acl_list(): array {
         'plugin_set_config'        => ['admin_plugins', 'update'],
         'plugin_dependency_install' => ['admin_plugins', 'execution'],
         'plugin_daemon_action'     => ['admin_plugins', 'execution'],
+        'plugin_device_schema'     => ['devices',        'read'],
+        'plugin_device_create'     => ['devices',        'create'],
         'logs_list'                => ['admin_logs',    'read'],
         'log_read'                 => ['admin_logs',    'read'],
     ];
@@ -731,6 +762,82 @@ function tool_acl_list(): array {
     }
 
     return ['mode' => $mode, 'authorized_tools' => $authorized];
+}
+
+function plugin_load_class(string $plugin_id): void {
+    $classFile = dirname(__FILE__) . '/../../../plugins/' . $plugin_id . '/core/class/' . $plugin_id . '.class.php';
+    if (!file_exists($classFile)) throw new Exception("Plugin class file not found for: {$plugin_id}");
+    require_once $classFile;
+    if (!class_exists($plugin_id)) throw new Exception("Class '{$plugin_id}' not found after loading class file.");
+}
+
+function tool_plugin_device_schema(string $plugin_id): array {
+    acl_check('devices', 'read');
+    if (empty($plugin_id)) throw new Exception('plugin_id is required');
+    $plugin = plugin::byId($plugin_id);
+    if (!$plugin) throw new Exception("Plugin not found: {$plugin_id}");
+
+    plugin_load_class($plugin_id);
+
+    $fields = [];
+    $existing = eqLogic::byType($plugin_id);
+    if (!empty($existing)) {
+        $keys_seen = [];
+        foreach ($existing as $eq) {
+            $cfg = $eq->getConfiguration();
+            if (!is_array($cfg)) continue;
+            foreach ($cfg as $key => $value) {
+                if (isset($keys_seen[$key])) continue;
+                $keys_seen[$key] = true;
+                $fields[] = [
+                    'key'           => $key,
+                    'example_value' => is_scalar($value) ? $value : json_encode($value),
+                    'type'          => is_bool($value) ? 'boolean' : (is_int($value) ? 'integer' : (is_numeric($value) ? 'number' : 'string')),
+                ];
+            }
+        }
+        $source = 'introspection';
+    } else {
+        $source = 'none';
+    }
+
+    return [
+        'plugin_id' => $plugin_id,
+        'source'    => $source,
+        'note'      => $source === 'none'
+            ? 'No existing devices found for this plugin. Config keys cannot be discovered automatically — refer to plugin documentation.'
+            : 'Fields discovered from existing devices of this plugin type.',
+        'fields'    => $fields,
+    ];
+}
+
+function tool_plugin_device_create(string $plugin_id, string $name, ?int $room_id, bool $enabled, bool $visible, array $config): array {
+    acl_check('devices', 'create');
+    if (empty($plugin_id)) throw new Exception('plugin_id is required');
+    if (empty($name))      throw new Exception('name is required');
+
+    $plugin = plugin::byId($plugin_id);
+    if (!$plugin) throw new Exception("Plugin not found: {$plugin_id}");
+    if (!$plugin->isActive()) throw new Exception("Plugin '{$plugin_id}' is not active.");
+
+    plugin_load_class($plugin_id);
+
+    $eq = new $plugin_id();
+    $eq->setName($name);
+    $eq->setEqType_name($plugin_id);
+    $eq->setIsEnable($enabled ? 1 : 0);
+    $eq->setIsVisible($visible ? 1 : 0);
+    if ($room_id !== null) {
+        $room = jeeObject::byId($room_id);
+        if (!$room) throw new Exception("Room not found: {$room_id}");
+        $eq->setObject_id($room_id);
+    }
+    foreach ($config as $key => $value) {
+        $eq->setConfiguration($key, $value);
+    }
+    $eq->save();
+
+    return fmt_equipment(eqLogic::byId($eq->getId()));
 }
 
 function tool_devices_list(?array $categories = null, ?array $room_ids = null, int $limit = 50, int $offset = 0, bool $include_state = true, bool $include_actions = true, bool $include_hidden = false): array {
