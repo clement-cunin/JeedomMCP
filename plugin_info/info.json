@@ -5,7 +5,7 @@
     "licence": "AGPL",
     "author": "clement-cunin",
     "require": "4.4",
-    "category": "programming",
+    "category": "communication",
     "hasDependency": false,
     "hasOwnDeamon": false,
     "changelog": "https://github.com/clement-cunin/JeedomMCP/blob/main/CHANGELOG.md",
