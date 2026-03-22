@@ -20,7 +20,15 @@ ob_clean();
 if (isset($_GET['action'])) {
     ob_end_clean();
     header('Content-Type: application/json; charset=utf-8');
-    if (!isConnect('admin')) {
+    $authorized = false;
+    if (isset($_POST['nonce'])) {
+        $stored = config::byKey('admin_nonce', 'jeedomMCP', '');
+        $parts = explode('|', $stored);
+        if (count($parts) === 2 && hash_equals($parts[0], $_POST['nonce']) && time() < (int)$parts[1]) {
+            $authorized = true;
+        }
+    }
+    if (!$authorized) {
         http_response_code(403);
         echo json_encode(['error' => 'Unauthorized']);
         exit;

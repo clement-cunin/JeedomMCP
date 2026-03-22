@@ -4,6 +4,10 @@ if (!isConnect('admin')) {
 }
 $mcpUrl = network::getNetworkAccess('external', 'proto:ip:port:comp') . '/plugins/jeedomMCP/api/mcp.php';
 
+// One-time admin token valid 5 minutes (avoids relying on session in api/ context)
+$adminNonce = bin2hex(random_bytes(16));
+config::save('admin_nonce', $adminNonce . '|' . (time() + 300), 'jeedomMCP');
+
 // ACL matrix: domain => [op => has_tool]
 $acl_matrix = [
     'devices'    => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => false, 'update' => true, 'delete' => false],
@@ -183,6 +187,7 @@ $acl_tools = [
 
 <script>
 var mcpUrl = '<?php echo $mcpUrl; ?>';
+var adminNonce = '<?php echo $adminNonce; ?>';
 
 // ---------------------------------------------------------------------------
 // MCP JSON preview
@@ -229,6 +234,7 @@ $('#bt_regenerateApiKey').on('click', function () {
         $.ajax({
             type: 'POST',
             url: 'plugins/jeedomMCP/api/mcp.php?action=generateApiKey',
+            data: { nonce: adminNonce },
             dataType: 'json',
             success: function (data) {
                 if (!data.success) {
