@@ -184,6 +184,24 @@ function mcp_get_tools(): array {
             ],
         ],
         [
+            'name'        => 'device_update',
+            'description' => 'Update a device\'s metadata: name, room assignment, and/or categories. Only provided fields are modified.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'equipment_id' => ['type' => 'integer', 'description' => 'Equipment ID obtained from devices_list.'],
+                    'name'         => ['type' => 'string',  'description' => 'New display name for the device.'],
+                    'room_id'      => ['type' => 'integer', 'description' => 'ID of the room to assign the device to. Pass 0 to unassign.'],
+                    'categories'   => [
+                        'type'        => 'array',
+                        'description' => 'List of category keys to assign. Replaces existing categories.',
+                        'items'       => ['type' => 'string', 'enum' => ['heating', 'security', 'energy', 'light', 'opening', 'automatism', 'multimedia', 'default']],
+                    ],
+                ],
+                'required' => ['equipment_id'],
+            ],
+        ],
+        [
             'name'        => 'devices_states',
             'description' => 'Bulk refresh the state of a specific set of equipment. Returns only {id, state} per device — use devices_list for full discovery.',
             'inputSchema' => [
@@ -525,6 +543,7 @@ function mcp_call_tool(string $name, array $args): array {
             case 'acl_list':            return tool_result(tool_acl_list());
             case 'devices_list':        return tool_result(tool_devices_list($args['categories'] ?? null, $args['room_ids'] ?? null, intval($args['limit'] ?? 50), intval($args['offset'] ?? 0), isset($args['include_state']) ? (bool)$args['include_state'] : true, isset($args['include_actions']) ? (bool)$args['include_actions'] : true, isset($args['include_hidden']) ? (bool)$args['include_hidden'] : false));
             case 'device_set_description': return tool_result(tool_device_set_description((int)($args['equipment_id'] ?? 0), (string)($args['description'] ?? '')));
+            case 'device_update':       return tool_result(tool_device_update((int)($args['equipment_id'] ?? 0), $args));
             case 'devices_states':      return tool_result(tool_devices_states($args['equipment_ids'] ?? []));
             case 'command_execute':     return tool_result(tool_command_execute($args['commands'] ?? []));
             case 'rooms_list':          return tool_result(tool_rooms_list(intval($args['limit'] ?? 50), intval($args['offset'] ?? 0)));
@@ -638,6 +657,7 @@ function tool_acl_list(): array {
         'devices_states'           => ['devices',    'read'],
         'command_execute'          => ['devices',    'execution'],
         'device_set_description'   => ['devices',    'set_description'],
+        'device_update'            => ['devices',    'update'],
         'rooms_list'               => ['rooms',      'read'],
         'room_set_description'     => ['rooms',      'set_description'],
         'room_create'              => ['rooms',      'create'],
@@ -726,6 +746,34 @@ function tool_device_set_description(int $equipment_id, string $description): ar
     $eq = eqLogic::byId($equipment_id);
     if (!is_object($eq)) throw new Exception("Equipment {$equipment_id} not found");
     $eq->setComment($description);
+    $eq->save();
+    return fmt_equipment($eq);
+}
+
+function tool_device_update(int $equipment_id, array $args): array {
+    acl_check('devices', 'update');
+    if ($equipment_id === 0) throw new Exception('equipment_id is required');
+    $eq = eqLogic::byId($equipment_id);
+    if (!is_object($eq)) throw new Exception("Equipment {$equipment_id} not found");
+    $valid_categories = ['heating', 'security', 'energy', 'light', 'opening', 'automatism', 'multimedia', 'default'];
+    if (array_key_exists('name', $args)) {
+        if ((string)$args['name'] === '') throw new Exception('name cannot be empty');
+        $eq->setName((string)$args['name']);
+    }
+    if (array_key_exists('room_id', $args)) {
+        $room_id = (int)$args['room_id'];
+        if ($room_id !== 0 && !is_object(jeeObject::byId($room_id))) throw new Exception("Room {$room_id} not found");
+        $eq->setObject_id($room_id ?: null);
+    }
+    if (array_key_exists('categories', $args)) {
+        $cats = (array)$args['categories'];
+        foreach ($cats as $c) {
+            if (!in_array($c, $valid_categories, true)) throw new Exception("Invalid category: {$c}");
+        }
+        foreach ($valid_categories as $key) {
+            $eq->setCategory($key, in_array($key, $cats, true) ? 1 : 0);
+        }
+    }
     $eq->save();
     return fmt_equipment($eq);
 }

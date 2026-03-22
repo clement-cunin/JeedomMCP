@@ -108,6 +108,29 @@ Sets the description (comment field) of a Jeedom equipment.
 
 ---
 
+## `device_update`
+
+Updates a device's metadata. Only provided fields are modified.
+
+> **ACL**: `devices.update`
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `equipment_id` | int | yes | Equipment ID (from `devices_list`) |
+| `name` | string | no | New display name |
+| `room_id` | int | no | Room ID to assign the device to (`0` to unassign) |
+| `categories` | string[] | no | Category keys — replaces all existing categories. Valid values: `heating`, `security`, `energy`, `light`, `opening`, `automatism`, `multimedia`, `default` |
+
+**Returns**: updated equipment object
+
+```json
+{ "id": 109, "name": "Roomba", "room_id": 8, "categories": ["automatism"] }
+```
+
+---
+
 ## `devices_states`
 
 Lightweight bulk refresh tool. Returns only the current state for a specific set of equipment. Use `devices_list` for full discovery (metadata + actions).
