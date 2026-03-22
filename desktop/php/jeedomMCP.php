@@ -2,9 +2,9 @@
 if (!isConnect('admin')) {
     throw new Exception('{{401 - Unauthorized access}}');
 }
-$plugin = plugin::byId('JeedomMCP');
+$plugin = plugin::byId('jeedomMCP');
 sendVarToJS('eqType', $plugin->getId());
-$eqLogics = eqLogic::byType('JeedomMCP');
+$eqLogics = eqLogic::byType('jeedomMCP');
 ?>
 
 <div class="row row-overflow">

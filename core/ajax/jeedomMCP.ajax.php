@@ -8,7 +8,7 @@ try {
     }
 
     if (init('action') == 'generateApiKey') {
-        ajax::success(JeedomMCP::generateApiKey());
+        ajax::success(jeedomMCP::generateApiKey());
     }
 
     throw new Exception(__('No method found for: ', __FILE__) . init('action'));

@@ -1,6 +1,6 @@
 <?php
 
-class JeedomMCP extends eqLogic {
+class jeedomMCP extends eqLogic {
 
     /**
      * Generate a cryptographically secure API key and persist it.

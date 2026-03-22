@@ -42,14 +42,14 @@ function tool_error(string $message): array {
 }
 
 function acl_allowed(string $domain, string $operation): bool {
-    $mode = config::byKey('acl_mode', 'JeedomMCP', 'read_execute');
+    $mode = config::byKey('acl_mode', 'jeedomMCP', 'read_execute');
     switch ($mode) {
         case 'full_admin': return true;
         case 'full':       return strncmp($domain, 'admin', 5) !== 0;
         case 'read_execute_describe':
             return in_array($operation, ['read', 'execution', 'set_description']);
         case 'custom':
-            return config::byKey("acl_{$domain}_{$operation}", 'JeedomMCP', '0') == 1;
+            return config::byKey("acl_{$domain}_{$operation}", 'jeedomMCP', '0') == 1;
         default: // read_execute
             return in_array($operation, ['read', 'execution']);
     }
@@ -65,7 +65,7 @@ function acl_check(string $domain, string $operation): void {
 // Authentication
 // ---------------------------------------------------------------------------
 
-$api_key = config::byKey('mcpApiKey', 'JeedomMCP');
+$api_key = config::byKey('mcpApiKey', 'jeedomMCP');
 $request_key = $_SERVER['HTTP_X_API_KEY'] ?? '';
 
 if (empty($api_key) || $request_key !== $api_key) {
@@ -626,7 +626,7 @@ function fmt_state_map(array $cmds): object {
         if ($value === null) continue;
         if (array_key_exists($name, $state)) {
             $suffixed = $name . '_' . intval($cmd->getId());
-            log::add('JeedomMCP', 'warning', "Duplicate info command name '{$name}' on equipment {$cmd->getEqLogic_id()} — using '{$suffixed}'");
+            log::add('jeedomMCP', 'warning', "Duplicate info command name '{$name}' on equipment {$cmd->getEqLogic_id()} — using '{$suffixed}'");
             $state[$suffixed] = $value;
         } else {
             $state[$name] = $value;
@@ -649,7 +649,7 @@ function fmt_actions(array $cmds): array {
 }
 
 function tool_acl_list(): array {
-    $mode = config::byKey('acl_mode', 'JeedomMCP', 'read_execute');
+    $mode = config::byKey('acl_mode', 'jeedomMCP', 'read_execute');
 
     // tool => [domain, operation]
     $tool_map = [

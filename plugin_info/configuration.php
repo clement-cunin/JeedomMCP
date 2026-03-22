@@ -2,7 +2,7 @@
 if (!isConnect('admin')) {
     throw new Exception('{{401 - Unauthorized access}}');
 }
-$mcpUrl = network::getNetworkAccess('external', 'proto:ip:port:comp') . '/plugins/JeedomMCP/api/mcp.php';
+$mcpUrl = network::getNetworkAccess('external', 'proto:ip:port:comp') . '/plugins/jeedomMCP/api/mcp.php';
 
 // ACL matrix: domain => [op => has_tool]
 $acl_matrix = [
@@ -20,8 +20,8 @@ $acl_defaults = [
 ];
 
 // Initialize acl_mode default
-if (!in_array((string)config::byKey('acl_mode', 'JeedomMCP'), ['read_execute', 'read_execute_describe', 'full', 'full_admin', 'custom'], true)) {
-    config::save('acl_mode', 'read_execute', 'JeedomMCP');
+if (!in_array((string)config::byKey('acl_mode', 'jeedomMCP'), ['read_execute', 'read_execute_describe', 'full', 'full_admin', 'custom'], true)) {
+    config::save('acl_mode', 'read_execute', 'jeedomMCP');
 }
 
 // Initialize custom per-op defaults (used when mode is custom)
@@ -29,9 +29,9 @@ foreach ($acl_matrix as $domain => $ops) {
     foreach ($ops as $op => $has_tool) {
         if (!$has_tool) continue;
         $key = "acl_{$domain}_{$op}";
-        $current = (string)config::byKey($key, 'JeedomMCP');
+        $current = (string)config::byKey($key, 'jeedomMCP');
         if (!in_array($current, ['0', '1'], true)) {
-            config::save($key, $acl_defaults[$op], 'JeedomMCP');
+            config::save($key, $acl_defaults[$op], 'jeedomMCP');
         }
     }
 }
@@ -228,7 +228,7 @@ $('#bt_regenerateApiKey').on('click', function () {
         if (!result) return;
         $.ajax({
             type: 'POST',
-            url: 'plugins/JeedomMCP/core/ajax/JeedomMCP.ajax.php',
+            url: 'plugins/jeedomMCP/core/ajax/jeedomMCP.ajax.php',
             data: { action: 'generateApiKey' },
             dataType: 'json',
             success: function (data) {
