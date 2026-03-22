@@ -26,4 +26,6 @@
 - State maps omit null-valued fields; empty state returns `{}` instead of `[]`
 - Admin log tools: `logs_list` and `log_read` (ACL domain `admin_logs`)
 - Admin plugin tools: `plugins_list`, `plugin_market_list`, `plugin_install`, `plugin_uninstall`, `plugin_set_active` (ACL domain `admin_plugins`)
+- Extended plugin management: `plugin_get_config`, `plugin_set_config` (log level, daemon/dependency auto-mode), `plugin_daemon_action` (start/stop/restart), `plugin_dependency_install`
+- `plugin_install` supports `version` channel (`stable` or `beta`)
 - New ACL preset `full_admin` — grants full access including all admin operations

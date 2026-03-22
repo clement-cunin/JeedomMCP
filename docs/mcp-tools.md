@@ -609,6 +609,114 @@ Search plugins available on the Jeedom Market. Returns a paginated list.
 
 ---
 
+## `plugin_get_config`
+
+Returns detailed configuration for an installed plugin: log level, dependency status, and daemon state.
+
+> **ACL**: `admin_plugins.read`
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `plugin_id` | string | yes | Plugin identifier |
+
+**Returns**:
+
+```json
+{
+  "id": "openzwave",
+  "name": "Z-Wave",
+  "version": "4.2.1",
+  "category": "automation",
+  "active": true,
+  "log_level": "warning",
+  "dependency": {
+    "state": "ok",
+    "auto_install": true,
+    "last_launch": "2026-03-21 10:00:00"
+  },
+  "daemon": {
+    "state": "ok",
+    "auto_restart": true,
+    "launchable": true,
+    "last_launch": "2026-03-21 10:00:00"
+  }
+}
+```
+
+> - `dependency.state`: `ok`, `nok`, or `in_progress`. When `in_progress`, `progression` (0–100) and `duration` (minutes elapsed) are added.
+> - `dependency.auto_install`: whether automatic dependency installation is enabled.
+> - `dependency` and `daemon` are omitted for plugins without dependencies or daemon.
+
+---
+
+## `plugin_set_config`
+
+Updates plugin settings: log level, daemon auto-restart, and/or dependency auto-install.
+
+> **ACL**: `admin_plugins.update`
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `plugin_id` | string | yes | Plugin identifier |
+| `log_level` | string | no | Log verbosity: `debug`, `info`, `notice`, `warning`, `error`, `critical`, or `default` (inherit global) |
+| `daemon_auto_restart` | boolean | no | Enable or disable automatic daemon restart |
+| `dependency_auto_install` | boolean | no | Enable or disable automatic dependency installation |
+
+**Returns**:
+
+```json
+{ "success": true, "plugin_id": "openzwave", "log_level": "debug", "daemon_auto_restart": true, "dependency_auto_install": false }
+```
+
+> Only changed fields are included in the response. Calling with no optional fields is a no-op.
+
+---
+
+## `plugin_dependency_install`
+
+Triggers dependency installation for a plugin. Runs in background — use `plugin_get_config` to monitor `dependency.state` and `dependency.progression`.
+
+> **ACL**: `admin_plugins.execution`
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `plugin_id` | string | yes | Plugin identifier |
+
+**Returns**:
+
+```json
+{ "success": true, "plugin_id": "openzwave", "state": "in_progress" }
+```
+
+---
+
+## `plugin_daemon_action`
+
+Starts, stops or restarts a plugin daemon.
+
+> **ACL**: `admin_plugins.execution`
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `plugin_id` | string | yes | Plugin identifier |
+| `action` | string | yes | `start`, `stop`, or `restart` |
+
+**Returns**:
+
+```json
+{ "success": true, "plugin_id": "openzwave", "action": "restart", "state": "ok" }
+```
+
+---
+
 ## `plugin_install`
 
 Installs or updates a plugin from the Jeedom Market.
