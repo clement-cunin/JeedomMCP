@@ -436,6 +436,7 @@ function mcp_get_tools(): array {
                     'category'      => ['type' => 'string',  'description' => 'Filter by category (e.g. automation, security, energy).'],
                     'certification' => ['type' => 'string',  'description' => 'Filter by certification level.', 'enum' => ['Officiel', 'Conseillé', 'Premium', 'Partenaire', 'Legacy']],
                     'cost'          => ['type' => 'string',  'description' => 'Filter by cost.', 'enum' => ['free', 'paying']],
+                    'channel'       => ['type' => 'string',  'description' => 'Release channel to search (default: stable).', 'enum' => ['stable', 'beta']],
                     'limit'         => ['type' => 'integer', 'description' => 'Maximum number of results (default 20). Use 0 for no limit.'],
                     'offset'        => ['type' => 'integer', 'description' => 'Number of results to skip (default 0).'],
                 ],
@@ -593,7 +594,7 @@ function mcp_call_tool(string $name, array $args): array {
             case 'plugins_list':        return tool_result(tool_plugins_list());
             case 'plugin_get_config':   return tool_result(tool_plugin_get_config((string)($args['plugin_id'] ?? '')));
             case 'plugin_set_config':   return tool_result(tool_plugin_set_config((string)($args['plugin_id'] ?? ''), $args['log_level'] ?? null, isset($args['daemon_auto_restart']) ? (bool)$args['daemon_auto_restart'] : null, isset($args['dependency_auto_install']) ? (bool)$args['dependency_auto_install'] : null));
-            case 'plugin_market_list': return tool_result(tool_plugin_market_list($args['search'] ?? null, $args['category'] ?? null, $args['certification'] ?? null, $args['cost'] ?? null, intval($args['limit'] ?? 20), intval($args['offset'] ?? 0)));
+            case 'plugin_market_list': return tool_result(tool_plugin_market_list($args['search'] ?? null, $args['category'] ?? null, $args['certification'] ?? null, $args['cost'] ?? null, $args['channel'] ?? 'stable', intval($args['limit'] ?? 20), intval($args['offset'] ?? 0)));
             case 'plugin_install':      return tool_result(tool_plugin_install((string)($args['plugin_id'] ?? ''), (string)($args['version'] ?? 'stable')));
             case 'plugin_uninstall':    return tool_result(tool_plugin_uninstall((string)($args['plugin_id'] ?? '')));
             case 'plugin_set_active':   return tool_result(tool_plugin_set_active((string)($args['plugin_id'] ?? ''), (bool)($args['active'] ?? true)));
@@ -1093,11 +1094,11 @@ function tool_plugins_list(): array {
     return $result;
 }
 
-function tool_plugin_market_list(?string $search = null, ?string $category = null, ?string $certification = null, ?string $cost = null, int $limit = 20, int $offset = 0): array {
+function tool_plugin_market_list(?string $search = null, ?string $category = null, ?string $certification = null, ?string $cost = null, string $channel = 'stable', int $limit = 20, int $offset = 0): array {
     acl_check('admin_plugins', 'read');
     $filter = [
         'type'          => 'plugin',
-        'status'        => 'stable',
+        'status'        => in_array($channel, ['stable', 'beta']) ? $channel : 'stable',
         'name'          => $search ?: null,
         'categorie'     => $category ?: null,
         'certification' => $certification ?: null,

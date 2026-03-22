@@ -603,6 +603,7 @@ Search plugins available on the Jeedom Market. Returns a paginated list.
 | `category` | string | no | Filter by category |
 | `certification` | string | no | `Officiel`, `Conseillé`, `Premium`, `Partenaire`, or `Legacy` |
 | `cost` | string | no | `free` or `paying` |
+| `channel` | string | no | Release channel: `stable` (default) or `beta` |
 | `limit` | int | no | Maximum results (default: 20). Use 0 for no limit. |
 | `offset` | int | no | Number of results to skip (default: 0) |
 
