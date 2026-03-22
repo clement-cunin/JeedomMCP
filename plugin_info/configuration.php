@@ -6,7 +6,7 @@ $mcpUrl = network::getNetworkAccess('external', 'proto:ip:port:comp') . '/plugin
 
 // ACL matrix: domain => [op => has_tool]
 $acl_matrix = [
-    'devices'    => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => false, 'update' => false, 'delete' => false],
+    'devices'    => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => false, 'update' => true, 'delete' => false],
     'rooms'      => ['read' => true, 'execution' => false, 'set_description' => true, 'create' => true, 'update' => true, 'delete' => true],
     'scenarios'  => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => true, 'update' => true, 'delete' => true],
     'admin_plugins' => ['read' => true, 'execution' => true, 'set_description' => false, 'create' => true,  'update' => true, 'delete' => true],
@@ -58,6 +58,7 @@ $acl_tools = [
         'read'            => ['devices_list', 'device_state', 'devices_states'],
         'execution'       => ['command_execute'],
         'set_description' => ['device_set_description'],
+        'update'          => ['device_update'],
     ],
     'rooms' => [
         'read'            => ['rooms_list'],
