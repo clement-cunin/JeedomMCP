@@ -639,7 +639,7 @@ Search plugins available on the Jeedom Market. Returns a paginated list.
 
 ## `plugin_get_config`
 
-Returns detailed configuration for an installed plugin: log level, dependency status, and daemon state.
+Returns detailed configuration for an installed plugin: log level, dependency status, daemon state, and plugin-specific config keys with their current values (discovered by parsing `plugin_info/configuration.php`).
 
 > **ACL**: `admin_plugins.read`
 
@@ -669,6 +669,13 @@ Returns detailed configuration for an installed plugin: log level, dependency st
     "auto_restart": true,
     "launchable": true,
     "last_launch": "2026-03-21 10:00:00"
+  },
+  "config": {
+    "MerossLogin": "mon@email.com",
+    "MerossPassword": "",
+    "GoveeAPI": "",
+    "TapoMail": "",
+    "TapoPassword": ""
   }
 }
 ```
@@ -676,6 +683,7 @@ Returns detailed configuration for an installed plugin: log level, dependency st
 > - `dependency.state`: `ok`, `nok`, or `in_progress`. When `in_progress`, `progression` (0–100) and `duration` (minutes elapsed) are added.
 > - `dependency.auto_install`: whether automatic dependency installation is enabled.
 > - `dependency` and `daemon` are omitted for plugins without dependencies or daemon.
+> - `config` is omitted for plugins with no configurable parameters (no `data-l1key` fields in `plugin_info/configuration.php`).
 
 ---
 
@@ -701,6 +709,27 @@ Updates plugin settings: log level, daemon auto-restart, and/or dependency auto-
 ```
 
 > Only changed fields are included in the response. Calling with no optional fields is a no-op.
+
+---
+
+## `plugin_set_plugin_config`
+
+Saves plugin-specific configuration values (e.g. credentials, API keys). Use `plugin_get_config` first to discover available keys. Keys are validated against those declared in `plugin_info/configuration.php`.
+
+> **ACL**: `admin_plugins.update`
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `plugin_id` | string | yes | Plugin identifier |
+| `config` | object | yes | Key/value pairs to save |
+
+**Returns**:
+
+```json
+{ "success": true, "plugin_id": "wifilightV2", "updated": ["MerossLogin", "MerossPassword"] }
+```
 
 ---
 
