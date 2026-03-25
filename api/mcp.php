@@ -193,9 +193,10 @@ function mcp_get_tools(): array {
                         'items'       => ['type' => 'integer'],
                         'description' => 'Filter by room — returns only equipment whose room_id is in this list.',
                     ],
-                    'include_hidden'  => ['type' => 'boolean', 'description' => 'Include devices hidden in the Jeedom UI (is_visible=false). Default false.'],
-                    'include_state'   => ['type' => 'boolean', 'description' => 'Include the state map for each device (default true).'],
-                    'include_actions' => ['type' => 'boolean', 'description' => 'Include the actions array for each device (default true).'],
+                    'include_hidden'     => ['type' => 'boolean', 'description' => 'Include devices hidden in the Jeedom UI (is_visible=false). Default false.'],
+                    'include_state'      => ['type' => 'boolean', 'description' => 'Include the state map for each device (default true).'],
+                    'include_actions'    => ['type' => 'boolean', 'description' => 'Include the actions array for each device (default true).'],
+                    'include_historical' => ['type' => 'boolean', 'description' => 'Include a "historical" array listing historized info commands with their id, name and unit. Use these ids with device_get_history. Default false.'],
                     'limit'           => ['type' => 'integer', 'description' => 'Maximum number of items to return (default 50). Use 0 for no limit.'],
                     'offset'          => ['type' => 'integer', 'description' => 'Number of items to skip (default 0).'],
                 ],
@@ -230,6 +231,23 @@ function mcp_get_tools(): array {
                     ],
                 ],
                 'required' => ['equipment_id'],
+            ],
+        ],
+        [
+            'name'        => 'device_get_history',
+            'description' => 'Query the history of a device command (sensor values, power consumption, states…). Identify the command either by command_id alone, or by equipment_id + command_name together. Use devices_list with include_historical=true to discover historized command names.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'command_id'     => ['type' => 'integer', 'description' => 'Direct command ID. Use this or (equipment_id + command_name).'],
+                    'equipment_id'   => ['type' => 'integer', 'description' => 'Equipment ID (from devices_list). Use with command_name.'],
+                    'command_name'   => ['type' => 'string',  'description' => 'Name of the historized command (from the historical array in devices_list). Use with equipment_id.'],
+                    'start'          => ['type' => 'string',  'description' => 'Start datetime, ISO 8601 or YYYY-MM-DD. Defaults to 7 days ago.'],
+                    'end'            => ['type' => 'string',  'description' => 'End datetime, ISO 8601 or YYYY-MM-DD. Defaults to now.'],
+                    'aggregate'      => ['type' => 'string',  'description' => '"stats" (default): single summary (avg/min/max/sum/count). "avg"/"min"/"max"/"sum": time series grouped by group_by. "raw": all individual points.', 'enum' => ['raw', 'stats', 'avg', 'min', 'max', 'sum']],
+                    'group_by'       => ['type' => 'string',  'description' => 'Time bucket for series aggregates. Ignored for "raw" and "stats".', 'enum' => ['hour', 'day']],
+                ],
+                'required' => [],
             ],
         ],
         [
@@ -594,9 +612,10 @@ function mcp_call_tool(string $name, array $args): array {
     try {
         switch ($name) {
             case 'acl_list':            return tool_result(tool_acl_list());
-            case 'devices_list':        return tool_result(tool_devices_list($args['categories'] ?? null, $args['room_ids'] ?? null, intval($args['limit'] ?? 50), intval($args['offset'] ?? 0), isset($args['include_state']) ? (bool)$args['include_state'] : true, isset($args['include_actions']) ? (bool)$args['include_actions'] : true, isset($args['include_hidden']) ? (bool)$args['include_hidden'] : false));
+            case 'devices_list':        return tool_result(tool_devices_list($args['categories'] ?? null, $args['room_ids'] ?? null, intval($args['limit'] ?? 50), intval($args['offset'] ?? 0), isset($args['include_state']) ? (bool)$args['include_state'] : true, isset($args['include_actions']) ? (bool)$args['include_actions'] : true, isset($args['include_hidden']) ? (bool)$args['include_hidden'] : false, isset($args['include_historical']) ? (bool)$args['include_historical'] : false));
             case 'device_set_description': return tool_result(tool_device_set_description((int)($args['equipment_id'] ?? 0), (string)($args['description'] ?? '')));
             case 'device_update':       return tool_result(tool_device_update((int)($args['equipment_id'] ?? 0), $args));
+            case 'device_get_history':  return tool_result(tool_device_get_history($args['command_id'] ?? null, $args['equipment_id'] ?? null, $args['command_name'] ?? null, $args['start'] ?? null, $args['end'] ?? null, $args['aggregate'] ?? 'stats', $args['group_by'] ?? 'day'));
             case 'devices_states':      return tool_result(tool_devices_states($args['equipment_ids'] ?? null, $args['categories'] ?? null, $args['room_ids'] ?? null));
             case 'command_execute':     return tool_result(tool_command_execute($args['commands'] ?? []));
             case 'rooms_list':          return tool_result(tool_rooms_list(intval($args['limit'] ?? 50), intval($args['offset'] ?? 0)));
@@ -709,6 +728,7 @@ function tool_acl_list(): array {
     $tool_map = [
         'devices_list'             => ['devices',    'read'],
         'devices_states'           => ['devices',    'read'],
+        'device_get_history'              => ['devices',    'read'],
         'command_execute'          => ['devices',    'execution'],
         'device_set_description'   => ['devices',    'set_description'],
         'device_update'            => ['devices',    'update'],
@@ -747,7 +767,7 @@ function tool_acl_list(): array {
     return ['mode' => $mode, 'authorized_tools' => $authorized];
 }
 
-function tool_devices_list(?array $categories = null, ?array $room_ids = null, int $limit = 50, int $offset = 0, bool $include_state = true, bool $include_actions = true, bool $include_hidden = false): array {
+function tool_devices_list(?array $categories = null, ?array $room_ids = null, int $limit = 50, int $offset = 0, bool $include_state = true, bool $include_actions = true, bool $include_hidden = false, bool $include_historical = false): array {
     acl_check('devices', 'read');
 
     $room_ids_int = null;
@@ -756,7 +776,7 @@ function tool_devices_list(?array $categories = null, ?array $room_ids = null, i
     }
 
     $commands_by_eq = [];
-    if ($include_state || $include_actions) {
+    if ($include_state || $include_actions || $include_historical) {
         foreach (cmd::all() as $cmd) {
             $commands_by_eq[$cmd->getEqLogic_id()][] = $cmd;
         }
@@ -777,6 +797,15 @@ function tool_devices_list(?array $categories = null, ?array $room_ids = null, i
         $cmds = $commands_by_eq[$eq->getId()] ?? [];
         if ($include_state)   $item['state']   = fmt_state_map($cmds);
         if ($include_actions) $item['actions']  = fmt_actions($cmds);
+        if ($include_historical) {
+            $hist = [];
+            foreach ($cmds as $cmd) {
+                if ($cmd->getType() === 'info' && $cmd->getIsHistorized()) {
+                    $hist[] = $cmd->getName() ?? '';
+                }
+            }
+            if (!empty($hist)) $item['historical'] = $hist;
+        }
         $all[] = $item;
     }
 
@@ -868,6 +897,73 @@ function tool_devices_states(?array $equipment_ids, ?array $categories, ?array $
         $result[] = ['id' => $id, 'state' => fmt_state_map($commands_by_eq[$id] ?? [])];
     }
     return $result;
+}
+
+function tool_device_get_history($raw_command_id, $raw_equipment_id, $raw_command_name, ?string $start, ?string $end, string $aggregate, string $group_by): array {
+    acl_check('devices', 'read');
+
+    if ($raw_command_id !== null) {
+        $cmd = cmd::byId((int)$raw_command_id);
+        if (!is_object($cmd)) throw new Exception("Command {$raw_command_id} not found");
+        if (!$cmd->getIsHistorized()) throw new Exception("Command {$raw_command_id} is not historized");
+    } elseif ($raw_equipment_id !== null && $raw_command_name !== null) {
+        $eq = eqLogic::byId((int)$raw_equipment_id);
+        if (!is_object($eq)) throw new Exception("Equipment {$raw_equipment_id} not found");
+        $cmd = null;
+        foreach ($eq->getCmd('info') as $c) {
+            if ($c->getName() === (string)$raw_command_name) { $cmd = $c; break; }
+        }
+        if (!is_object($cmd)) throw new Exception("Command '{$raw_command_name}' not found on equipment {$raw_equipment_id}");
+        if (!$cmd->getIsHistorized()) throw new Exception("Command '{$raw_command_name}' is not historized");
+    } else {
+        throw new Exception('Provide either command_id, or both equipment_id and command_name');
+    }
+
+    $command_id = intval($cmd->getId());
+    $start_dt = $start ? date('Y-m-d H:i:s', strtotime($start)) : date('Y-m-d H:i:s', strtotime('-7 days'));
+    $end_dt   = $end   ? date('Y-m-d H:i:s', strtotime($end))   : date('Y-m-d H:i:s');
+
+    $base = [
+        'command_id'   => $command_id,
+        'command_name' => $cmd->getName(),
+        'unit'       => $cmd->getUnite() ?: null,
+        'start'      => $start_dt,
+        'end'        => $end_dt,
+    ];
+
+    if ($aggregate === 'stats') {
+        $stats = history::getStatistique($command_id, $start_dt, $end_dt);
+        return array_merge($base, [
+            'aggregate' => 'stats',
+            'stats' => [
+                'avg'      => isset($stats['avg'])   ? round((float)$stats['avg'],   4) : null,
+                'min'      => isset($stats['min'])   ? round((float)$stats['min'],   4) : null,
+                'max'      => isset($stats['max'])   ? round((float)$stats['max'],   4) : null,
+                'sum'      => isset($stats['sum'])   ? round((float)$stats['sum'],   4) : null,
+                'count'    => isset($stats['count']) ? (int)$stats['count']              : 0,
+                'last'     => $stats['last'] ?? null,
+            ],
+        ]);
+    }
+
+    if ($aggregate === 'raw') {
+        $rows = history::all($command_id, $start_dt, $end_dt);
+        $points = [];
+        foreach ($rows as $row) {
+            $points[] = ['datetime' => $row->getDatetime(), 'value' => $row->getValue()];
+        }
+        return array_merge($base, ['aggregate' => 'raw', 'count' => count($points), 'points' => $points]);
+    }
+
+    // Time-series aggregation: avg, min, max, sum grouped by hour or day
+    $group_by = in_array($group_by, ['hour', 'day'], true) ? $group_by : 'day';
+    $groupingType = $aggregate . '::' . $group_by;
+    $rows = history::all($command_id, $start_dt, $end_dt, $groupingType);
+    $points = [];
+    foreach ($rows as $row) {
+        $points[] = ['datetime' => $row->getDatetime(), 'value' => $row->getValue()];
+    }
+    return array_merge($base, ['aggregate' => $aggregate, 'group_by' => $group_by, 'count' => count($points), 'points' => $points]);
 }
 
 function tool_command_execute(array $commands): array {

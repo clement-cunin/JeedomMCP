@@ -49,6 +49,7 @@ Discovery tool. Lists all enabled Jeedom equipment with their current state and 
 | `include_hidden` | bool | no | Include devices hidden in the Jeedom UI (`is_visible=false`). Default: `false` |
 | `include_state` | bool | no | Include the `state` map per device (default: `true`) |
 | `include_actions` | bool | no | Include the `actions` array per device (default: `true`) |
+| `include_historical` | bool | no | Include a `historical` array listing the names of historized info commands. Use these names with `device_get_history`. Default: `false` |
 | `limit` | int | no | Maximum number of items to return (default: 50). Use 0 for no limit. |
 | `offset` | int | no | Number of items to skip (default: 0). |
 
@@ -127,6 +128,65 @@ Updates a device's metadata. Only provided fields are modified.
 
 ```json
 { "id": 109, "name": "Roomba", "room_id": 8, "categories": ["automatism"] }
+```
+
+---
+
+## `device_get_history`
+
+Query the recorded history of a Jeedom command (sensor values, power consumption, device states, etc.). Only works on historized info commands.
+
+Use `devices_list` with `include_historical=true` to discover which command names support history. Hidden devices (`is_visible=false`) may also have history — use `include_hidden=true` to find them.
+
+> **ACL**: `devices.read`
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `command_id` | integer | no* | Direct command ID |
+| `equipment_id` | integer | no* | Equipment ID. Use with `command_name` |
+| `command_name` | string | no* | Name of the historized command (from `historical` in `devices_list`). Use with `equipment_id` |
+| `start` | string | no | Start date/time (YYYY-MM-DD or ISO 8601). Defaults to 7 days ago |
+| `end` | string | no | End date/time. Defaults to now |
+| `aggregate` | string | no | `stats` (default) · `raw` · `avg` · `min` · `max` · `sum` |
+| `group_by` | string | no | `day` (default) · `hour` — time bucket for `avg/min/max/sum` series |
+
+*Provide either `command_id` alone, or both `equipment_id` + `command_name`.
+
+**aggregate modes**:
+- `stats` — single summary object: avg, min, max, sum, count, last
+- `raw` — all individual data points
+- `avg` / `min` / `max` / `sum` — time series bucketed by `group_by`
+
+**Returns (stats)**:
+
+```json
+{
+  "command_id": 1259,
+  "command_name": "Puissance",
+  "unit": "W",
+  "start": "2026-03-01 00:00:00",
+  "end": "2026-03-24 00:00:00",
+  "aggregate": "stats",
+  "stats": { "avg": 29.21, "min": 2.91, "max": 188.72, "sum": 3680.67, "count": 126, "last": "18.992" }
+}
+```
+
+**Returns (time series)**:
+
+```json
+{
+  "command_id": 1259,
+  "command_name": "Puissance",
+  "aggregate": "sum",
+  "group_by": "day",
+  "count": 24,
+  "points": [
+    { "datetime": "2026-03-01", "value": "142.3" },
+    { "datetime": "2026-03-02", "value": "98.7" }
+  ]
+}
 ```
 
 ---
