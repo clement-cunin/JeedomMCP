@@ -941,3 +941,61 @@ Filters are applied before pagination: `total` reflects the filtered line count.
   "lines": ["[2026-03-21 14:32:00][WARNING][zwave] : node 12 ...", "..."]
 }
 ```
+
+---
+
+## `updates_list`
+
+List all pending updates for Jeedom core and installed plugins. Only items with status `update` are returned.
+
+> **ACL**: `admin_system.read` — requires `full_admin` or custom mode with `admin_system.read` enabled.
+
+**Parameters**: none
+
+**Returns**:
+
+```json
+{
+  "pending_updates": [
+    {
+      "logical_id": "jeedom",
+      "name": "Jeedom",
+      "type": "core",
+      "local_version": "4.4.12",
+      "remote_version": "4.4.15"
+    },
+    {
+      "logical_id": "wifilightV2",
+      "name": "wifilightV2",
+      "type": "plugin",
+      "local_version": "2025-01-10",
+      "remote_version": "2025-03-01"
+    }
+  ],
+  "count": 2
+}
+```
+
+---
+
+## `update_apply`
+
+Apply a pending update for Jeedom core or a plugin. Use `updates_list` first to confirm the item has a pending update.
+
+> **ACL**: `admin_system.create` — requires `full_admin` or custom mode with `admin_system.create` enabled.
+> **Warning**: this executes code on the Jeedom system. Core updates may require a restart.
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `logical_id` | string | yes | The `logical_id` of the item to update (e.g. `"jeedom"` for core, or the plugin id) |
+
+**Returns**:
+
+```json
+{
+  "logical_id": "wifilightV2",
+  "applied": true
+}
+```

@@ -15,6 +15,7 @@ $acl_matrix = [
     'scenarios'  => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => true, 'update' => true, 'delete' => true],
     'admin_plugins' => ['read' => true, 'execution' => true, 'set_description' => false, 'create' => true,  'update' => true, 'delete' => true],
     'admin_logs'    => ['read' => true, 'execution' => false, 'set_description' => false, 'create' => false, 'update' => false, 'delete' => false],
+    'admin_system'  => ['read' => true, 'execution' => false, 'set_description' => false, 'create' => false, 'update' => true,  'delete' => false],
 ];
 
 // Default preset: "Read & Execute"
@@ -46,6 +47,7 @@ $acl_domain_labels = [
     'scenarios'  => '{{Scenarios}}',
     'admin_plugins' => '{{Admin — Plugins}}',
     'admin_logs'    => '{{Admin — Logs}}',
+    'admin_system'  => '{{Admin — System}}',
 ];
 $acl_op_labels = [
     'read'            => '{{View / List}}',
@@ -88,6 +90,10 @@ $acl_tools = [
     ],
     'admin_logs' => [
         'read' => ['logs_list', 'log_read'],
+    ],
+    'admin_system' => [
+        'read'   => ['updates_list'],
+        'update' => ['update_apply'],
     ],
 ];
 ?>

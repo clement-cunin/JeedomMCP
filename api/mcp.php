@@ -586,6 +586,22 @@ function mcp_get_tools(): array {
             ],
         ],
         [
+            'name'        => 'updates_list',
+            'description' => 'List available updates for Jeedom core and installed plugins. Call this before update_apply to discover what can be updated.',
+            'inputSchema' => ['type' => 'object', 'properties' => new stdClass(), 'required' => []],
+        ],
+        [
+            'name'        => 'update_apply',
+            'description' => 'Apply a pending update for Jeedom core or a plugin. Use updates_list first to confirm the item has status "update". This executes code on the system.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'logical_id' => ['type' => 'string', 'description' => 'The logical_id of the item to update, as returned by updates_list (e.g. "jeedom" for core, or the plugin id).'],
+                ],
+                'required' => ['logical_id'],
+            ],
+        ],
+        [
             'name'        => 'scenario_create',
             'description' => 'Create a new Jeedom scenario.',
             'inputSchema' => [
@@ -643,6 +659,8 @@ function mcp_call_tool(string $name, array $args): array {
             case 'plugin_daemon_action': return tool_result(tool_plugin_daemon_action((string)($args['plugin_id'] ?? ''), (string)($args['action'] ?? '')));
             case 'logs_list':           return tool_result(tool_logs_list());
             case 'log_read':            return tool_result(tool_log_read((string)($args['log'] ?? ''), intval($args['lines'] ?? 100), intval($args['offset'] ?? 0), $args['min_level'] ?? null, $args['search'] ?? null));
+            case 'updates_list':        return tool_result(tool_updates_list());
+            case 'update_apply':        return tool_result(tool_update_apply((string)($args['logical_id'] ?? '')));
             default:                    return tool_error('Unknown tool: ' . $name);
         }
     } catch (Exception $e) {
@@ -757,6 +775,8 @@ function tool_acl_list(): array {
         'plugin_daemon_action'     => ['admin_plugins', 'execution'],
         'logs_list'                => ['admin_logs',    'read'],
         'log_read'                 => ['admin_logs',    'read'],
+        'updates_list'             => ['admin_system',  'read'],
+        'update_apply'             => ['admin_system',  'update'],
     ];
 
     $authorized = ['acl_list']; // always accessible
@@ -1528,4 +1548,30 @@ function tool_log_read(string $log, int $lines = 100, int $offset = 0, ?string $
         'offset' => $offset,
         'lines'  => $slice,
     ];
+}
+
+function tool_updates_list(): array {
+    acl_check('admin_system', 'read');
+    $result = [];
+    foreach (update::all() as $u) {
+        if ($u->getStatus() !== 'update') continue;
+        $result[] = [
+            'logical_id'      => $u->getLogicalId(),
+            'name'            => $u->getName() ?? $u->getLogicalId(),
+            'type'            => $u->getType(),
+            'local_version'   => $u->getLocalVersion() ?: null,
+            'remote_version'  => $u->getRemoteVersion() ?: null,
+        ];
+    }
+    return ['pending_updates' => $result, 'count' => count($result)];
+}
+
+function tool_update_apply(string $logical_id): array {
+    acl_check('admin_system', 'update');
+    if ($logical_id === '') throw new Exception('logical_id is required');
+    $u = update::byLogicalId($logical_id);
+    if (!is_object($u)) throw new Exception("No update entry found for '{$logical_id}'");
+    if ($u->getStatus() !== 'update') throw new Exception("'{$logical_id}' has no pending update (status: " . $u->getStatus() . ')');
+    $u->doUpdate();
+    return ['logical_id' => $logical_id, 'applied' => true];
 }
