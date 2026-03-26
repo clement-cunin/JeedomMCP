@@ -18,6 +18,18 @@ $acl_matrix = [
     'admin_system'  => ['read' => true, 'execution' => false, 'set_description' => false, 'create' => false, 'update' => true,  'delete' => false],
 ];
 
+// Dynamically add ext_{pluginId} domains from extension cache
+$ext_cache_path = __DIR__ . '/../cache/ext_tools.json';
+if (file_exists($ext_cache_path)) {
+    $ext_cache = json_decode(file_get_contents($ext_cache_path), true);
+    if (is_array($ext_cache['routing'] ?? null)) {
+        $ext_plugin_ids = array_unique(array_values($ext_cache['routing']));
+        foreach ($ext_plugin_ids as $extId) {
+            $acl_matrix["ext_{$extId}"] = ['execution' => true];
+        }
+    }
+}
+
 // Default preset: "Read & Execute"
 $acl_defaults = [
     'read' => '1', 'execution' => '1',
@@ -49,6 +61,15 @@ $acl_domain_labels = [
     'admin_logs'    => '{{Admin — Logs}}',
     'admin_system'  => '{{Admin — System}}',
 ];
+// Append extension plugin labels dynamically
+foreach (array_keys($acl_matrix) as $domain) {
+    if (strncmp($domain, 'ext_', 4) === 0) {
+        $pluginId = substr($domain, 4);
+        $p = plugin::byId($pluginId);
+        $label = is_object($p) ? $p->getName() : $pluginId;
+        $acl_domain_labels[$domain] = '{{Extension}} — ' . htmlspecialchars($label);
+    }
+}
 $acl_op_labels = [
     'read'            => '{{View / List}}',
     'execution'       => '{{Run commands}}',
@@ -96,6 +117,16 @@ $acl_tools = [
         'update' => ['update_apply'],
     ],
 ];
+// Append extension plugin tools dynamically from cache
+if (file_exists($ext_cache_path) && isset($ext_cache['tools'])) {
+    foreach ($ext_cache['tools'] as $tool) {
+        $pluginId = $ext_cache['routing'][$tool['name']] ?? null;
+        if (!$pluginId) continue;
+        $domain = "ext_{$pluginId}";
+        if (!isset($acl_tools[$domain])) $acl_tools[$domain] = [];
+        $acl_tools[$domain]['execution'][] = $tool['name'];
+    }
+}
 ?>
 
 <form class="form-horizontal">

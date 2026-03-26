@@ -74,14 +74,18 @@ function tool_error(string $message): array {
 
 function acl_allowed(string $domain, string $operation): bool {
     $mode = config::byKey('acl_mode', 'jeedomMCP', 'read_execute');
+    $is_ext   = strncmp($domain, 'ext_',   4) === 0;
+    $is_admin = strncmp($domain, 'admin_', 6) === 0;
     switch ($mode) {
         case 'full_admin': return true;
-        case 'full':       return strncmp($domain, 'admin', 5) !== 0;
+        case 'full':       return !$is_admin;
         case 'read_execute_describe':
+            if ($is_ext || $is_admin) return false;
             return in_array($operation, ['read', 'execution', 'set_description']);
         case 'custom':
             return config::byKey("acl_{$domain}_{$operation}", 'jeedomMCP', '0') == 1;
         default: // read_execute
+            if ($is_ext || $is_admin) return false;
             return in_array($operation, ['read', 'execution']);
     }
 }
@@ -90,6 +94,55 @@ function acl_check(string $domain, string $operation): void {
     if (!acl_allowed($domain, $operation)) {
         throw new Exception("Operation '{$operation}' on '{$domain}' is not authorized");
     }
+}
+
+// ---------------------------------------------------------------------------
+// Plugin extension cache
+// ---------------------------------------------------------------------------
+
+function ext_cache_path(): string {
+    return __DIR__ . '/../cache/ext_tools.json';
+}
+
+function ext_cache_build(): array {
+    $tools   = [];
+    $routing = [];
+    foreach (plugin::listPlugin(true) as $plugin) {
+        $id   = $plugin->getId();
+        $file = __DIR__ . "/../../{$id}/mcp/McpExtension.php";
+        if (!file_exists($file)) continue;
+        require_once $file;
+        $class = ucfirst($id) . 'McpExtension';
+        if (!class_exists($class) || !method_exists($class, 'getTools')) continue;
+        foreach ($class::getTools() as $tool) {
+            if (empty($tool['name'])) continue;
+            $prefixed           = "ext_{$id}_{$tool['name']}";
+            $tool['name']       = $prefixed;
+            $tools[]            = $tool;
+            $routing[$prefixed] = $id;
+        }
+    }
+    $cache = ['generated_at' => time(), 'tools' => $tools, 'routing' => $routing];
+    $dir   = dirname(ext_cache_path());
+    if (!is_dir($dir)) mkdir($dir, 0755, true);
+    file_put_contents(ext_cache_path(), json_encode($cache, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    return $cache;
+}
+
+function ext_cache_get(bool $force = false): array {
+    $path = ext_cache_path();
+    if (!$force && file_exists($path)) {
+        $data = json_decode(file_get_contents($path), true);
+        if (is_array($data) && isset($data['generated_at']) && (time() - $data['generated_at']) < 3600) {
+            return $data;
+        }
+    }
+    return ext_cache_build();
+}
+
+function ext_cache_invalidate(): void {
+    $path = ext_cache_path();
+    if (file_exists($path)) unlink($path);
 }
 
 // ---------------------------------------------------------------------------
@@ -586,22 +639,6 @@ function mcp_get_tools(): array {
             ],
         ],
         [
-            'name'        => 'updates_list',
-            'description' => 'List available updates for Jeedom core and installed plugins. Call this before update_apply to discover what can be updated.',
-            'inputSchema' => ['type' => 'object', 'properties' => new stdClass(), 'required' => []],
-        ],
-        [
-            'name'        => 'update_apply',
-            'description' => 'Apply a pending update for Jeedom core or a plugin. Use updates_list first to confirm the item has status "update". This executes code on the system.',
-            'inputSchema' => [
-                'type'       => 'object',
-                'properties' => [
-                    'logical_id' => ['type' => 'string', 'description' => 'The logical_id of the item to update, as returned by updates_list (e.g. "jeedom" for core, or the plugin id).'],
-                ],
-                'required' => ['logical_id'],
-            ],
-        ],
-        [
             'name'        => 'scenario_create',
             'description' => 'Create a new Jeedom scenario.',
             'inputSchema' => [
@@ -618,6 +655,17 @@ function mcp_get_tools(): array {
             ],
         ],
     ];
+
+    // Append extension tools from active plugins (served from cache)
+    $ext = ext_cache_get();
+    foreach ($ext['tools'] as $tool) {
+        $pluginId = $ext['routing'][$tool['name']] ?? null;
+        if ($pluginId && acl_allowed("ext_{$pluginId}", 'execution')) {
+            $tools[] = $tool;
+        }
+    }
+
+    return $tools;
 }
 
 // ---------------------------------------------------------------------------
@@ -659,10 +707,40 @@ function mcp_call_tool(string $name, array $args): array {
             case 'plugin_daemon_action': return tool_result(tool_plugin_daemon_action((string)($args['plugin_id'] ?? ''), (string)($args['action'] ?? '')));
             case 'logs_list':           return tool_result(tool_logs_list());
             case 'log_read':            return tool_result(tool_log_read((string)($args['log'] ?? ''), intval($args['lines'] ?? 100), intval($args['offset'] ?? 0), $args['min_level'] ?? null, $args['search'] ?? null));
-            case 'updates_list':        return tool_result(tool_updates_list());
-            case 'update_apply':        return tool_result(tool_update_apply((string)($args['logical_id'] ?? '')));
-            default:                    return tool_error('Unknown tool: ' . $name);
+            default:
+                if (strncmp($name, 'ext_', 4) === 0) return ext_call_tool($name, $args);
+                return tool_error('Unknown tool: ' . $name);
         }
+    } catch (Exception $e) {
+        return tool_error($e->getMessage());
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Extension tool routing
+// ---------------------------------------------------------------------------
+
+function ext_call_tool(string $name, array $args): array {
+    try {
+        $cache = ext_cache_get();
+        if (!isset($cache['routing'][$name])) {
+            // Cache may be stale — force rebuild and retry once
+            $cache = ext_cache_build();
+            if (!isset($cache['routing'][$name])) {
+                return tool_error("Unknown extension tool: {$name}");
+            }
+        }
+        $pluginId = $cache['routing'][$name];
+        acl_check("ext_{$pluginId}", 'execution');
+        $file = __DIR__ . "/../../{$pluginId}/mcp/McpExtension.php";
+        if (!file_exists($file)) return tool_error("McpExtension.php not found for plugin '{$pluginId}'");
+        require_once $file;
+        $class = ucfirst($pluginId) . 'McpExtension';
+        if (!class_exists($class) || !method_exists($class, 'callTool')) {
+            return tool_error("Class {$class} does not implement callTool()");
+        }
+        $unprefixed = substr($name, strlen("ext_{$pluginId}_"));
+        return $class::callTool($unprefixed, $args);
     } catch (Exception $e) {
         return tool_error($e->getMessage());
     }
@@ -775,13 +853,17 @@ function tool_acl_list(): array {
         'plugin_daemon_action'     => ['admin_plugins', 'execution'],
         'logs_list'                => ['admin_logs',    'read'],
         'log_read'                 => ['admin_logs',    'read'],
-        'updates_list'             => ['admin_system',  'read'],
-        'update_apply'             => ['admin_system',  'update'],
     ];
 
     $authorized = ['acl_list']; // always accessible
     foreach ($tool_map as $tool => $domain_op) {
         if (acl_allowed($domain_op[0], $domain_op[1])) $authorized[] = $tool;
+    }
+
+    // Add authorized extension tools
+    $ext = ext_cache_get();
+    foreach ($ext['routing'] as $toolName => $pluginId) {
+        if (acl_allowed("ext_{$pluginId}", 'execution')) $authorized[] = $toolName;
     }
 
     return ['mode' => $mode, 'authorized_tools' => $authorized];
@@ -1225,6 +1307,8 @@ function tool_scenario_create(array $args): array {
 
 function tool_plugins_list(): array {
     acl_check('admin_plugins', 'read');
+    // Refresh extension cache — plugin list may have changed
+    ext_cache_build();
     $result = [];
     foreach (plugin::listPlugin() as $p) {
         $u       = update::byLogicalId($p->getId());
@@ -1469,6 +1553,8 @@ function tool_plugin_set_active(string $plugin_id, bool $active): array {
     $plugin = plugin::byId($plugin_id);
     if (!is_object($plugin)) throw new Exception('Plugin not found: ' . $plugin_id);
     $plugin->setIsEnable($active ? 1 : 0);
+    // Invalidate extension cache — active plugin set has changed
+    ext_cache_invalidate();
     return [
         'success'   => true,
         'plugin_id' => $plugin_id,
@@ -1548,30 +1634,4 @@ function tool_log_read(string $log, int $lines = 100, int $offset = 0, ?string $
         'offset' => $offset,
         'lines'  => $slice,
     ];
-}
-
-function tool_updates_list(): array {
-    acl_check('admin_system', 'read');
-    $result = [];
-    foreach (update::all() as $u) {
-        if ($u->getStatus() !== 'update') continue;
-        $result[] = [
-            'logical_id'      => $u->getLogicalId(),
-            'name'            => $u->getName() ?? $u->getLogicalId(),
-            'type'            => $u->getType(),
-            'local_version'   => $u->getLocalVersion() ?: null,
-            'remote_version'  => $u->getRemoteVersion() ?: null,
-        ];
-    }
-    return ['pending_updates' => $result, 'count' => count($result)];
-}
-
-function tool_update_apply(string $logical_id): array {
-    acl_check('admin_system', 'update');
-    if ($logical_id === '') throw new Exception('logical_id is required');
-    $u = update::byLogicalId($logical_id);
-    if (!is_object($u)) throw new Exception("No update entry found for '{$logical_id}'");
-    if ($u->getStatus() !== 'update') throw new Exception("'{$logical_id}' has no pending update (status: " . $u->getStatus() . ')');
-    $u->doUpdate();
-    return ['logical_id' => $logical_id, 'applied' => true];
 }
