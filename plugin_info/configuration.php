@@ -183,6 +183,40 @@ $acl_tools = [
                             <?php endforeach; ?>
                         </tr>
                         <?php endforeach; ?>
+                    <?php
+                    // Dynamic rows for plugin extensions
+                    foreach (plugin::listPlugin(true) as $p) {
+                        $pid = $p->getId();
+                        if ($pid === 'jeedomMCP') continue;
+                        $ext_file = __DIR__ . "/../../{$pid}/mcp/McpExtension.php";
+                        if (!file_exists($ext_file)) continue;
+                        $key = "acl_ext_{$pid}_execution";
+                        $current = (string)config::byKey($key, 'jeedomMCP');
+                        if (!in_array($current, ['0', '1'], true)) {
+                            config::save($key, '0', 'jeedomMCP');
+                        }
+                        ?>
+                        <tr data-ext="1">
+                            <th style="vertical-align:top;padding-top:10px">
+                                <?php echo '{{Extensions}} — ' . htmlspecialchars($pid); ?>
+                            </th>
+                            <?php foreach (array_keys($acl_op_labels) as $op): ?>
+                            <td class="text-center">
+                                <?php if ($op === 'execution'): ?>
+                                <input type="checkbox"
+                                       class="configKey acl-checkbox"
+                                       data-l1key="<?php echo $key; ?>"
+                                       data-op="execution" />
+                                <div><small class="text-muted">ext_<?php echo htmlspecialchars($pid); ?>_*</small></div>
+                                <?php else: ?>
+                                <span class="text-muted">—</span>
+                                <?php endif; ?>
+                            </td>
+                            <?php endforeach; ?>
+                        </tr>
+                        <?php
+                    }
+                    ?>
                     </tbody>
                 </table>
             </div>
@@ -280,6 +314,7 @@ var ACL_MODE_OPS = {
 function applyAclMode(mode) {
     var isCustom    = (mode === 'custom');
     var isFullAdmin = (mode === 'full_admin');
+    var isFull      = (mode === 'full' || isFullAdmin);
     $('#acl_table_wrapper').css({
         'opacity':        isCustom ? '1'    : '0.5',
         'pointer-events': isCustom ? 'auto' : 'none'
@@ -287,8 +322,14 @@ function applyAclMode(mode) {
     if (!isCustom) {
         var ops = ACL_MODE_OPS[mode] || [];
         $('.acl-checkbox').each(function () {
-            var isAdminRow = $(this).closest('tr').data('admin') === 1;
-            $(this).prop('checked', (!isAdminRow || isFullAdmin) && ops.indexOf($(this).data('op')) !== -1);
+            var $tr       = $(this).closest('tr');
+            var isAdminRow = $tr.data('admin') === 1;
+            var isExtRow   = $tr.data('ext') === 1;
+            if (isExtRow) {
+                $(this).prop('checked', isFull);
+            } else {
+                $(this).prop('checked', (!isAdminRow || isFullAdmin) && ops.indexOf($(this).data('op')) !== -1);
+            }
         });
     }
 }
