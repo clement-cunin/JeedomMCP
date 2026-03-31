@@ -234,6 +234,17 @@ function mcp_get_tools(): array {
             ],
         ],
         [
+            'name'        => 'device_delete',
+            'description' => 'Permanently delete a Jeedom equipment and all its commands.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'equipment_id' => ['type' => 'integer', 'description' => 'Equipment ID obtained from devices_list.'],
+                ],
+                'required' => ['equipment_id'],
+            ],
+        ],
+        [
             'name'        => 'device_get_history',
             'description' => 'Query the history of a device command (sensor values, power consumption, states…). Identify the command either by command_id alone, or by equipment_id + command_name together. Use devices_list with include_historical=true to discover historized command names.',
             'inputSchema' => [
@@ -631,6 +642,7 @@ function mcp_call_tool(string $name, array $args): array {
             case 'devices_list':        return tool_result(tool_devices_list($args['categories'] ?? null, $args['room_ids'] ?? null, intval($args['limit'] ?? 50), intval($args['offset'] ?? 0), isset($args['include_state']) ? (bool)$args['include_state'] : true, isset($args['include_actions']) ? (bool)$args['include_actions'] : true, isset($args['include_hidden']) ? (bool)$args['include_hidden'] : false, isset($args['include_historical']) ? (bool)$args['include_historical'] : false));
             case 'device_set_description': return tool_result(tool_device_set_description((int)($args['equipment_id'] ?? 0), (string)($args['description'] ?? '')));
             case 'device_update':       return tool_result(tool_device_update((int)($args['equipment_id'] ?? 0), $args));
+            case 'device_delete':       return tool_result(tool_device_delete((int)($args['equipment_id'] ?? 0)));
             case 'device_get_history':  return tool_result(tool_device_get_history($args['command_id'] ?? null, $args['equipment_id'] ?? null, $args['command_name'] ?? null, $args['start'] ?? null, $args['end'] ?? null, $args['aggregate'] ?? 'stats', $args['group_by'] ?? 'day'));
             case 'devices_states':      return tool_result(tool_devices_states($args['equipment_ids'] ?? null, $args['categories'] ?? null, $args['room_ids'] ?? null));
             case 'command_execute':     return tool_result(tool_command_execute($args['commands'] ?? []));
@@ -750,6 +762,7 @@ function tool_acl_list(): array {
         'command_execute'          => ['devices',    'execution'],
         'device_set_description'   => ['devices',    'set_description'],
         'device_update'            => ['devices',    'update'],
+        'device_delete'            => ['devices',    'delete'],
         'rooms_list'               => ['rooms',      'read'],
         'room_set_description'     => ['rooms',      'set_description'],
         'room_create'              => ['rooms',      'create'],
@@ -852,6 +865,15 @@ function tool_device_set_description(int $equipment_id, string $description): ar
     $eq->setComment($description);
     $eq->save();
     return fmt_equipment($eq);
+}
+
+function tool_device_delete(int $equipment_id): array {
+    acl_check('devices', 'delete');
+    if ($equipment_id === 0) throw new Exception('equipment_id is required');
+    $eq = eqLogic::byId($equipment_id);
+    if (!is_object($eq)) throw new Exception("Equipment {$equipment_id} not found");
+    $eq->remove();
+    return ['success' => true, 'equipment_id' => $equipment_id];
 }
 
 function tool_device_update(int $equipment_id, array $args): array {
