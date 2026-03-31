@@ -132,6 +132,26 @@ Updates a device's metadata. Only provided fields are modified.
 
 ---
 
+## `device_delete`
+
+Permanently deletes a Jeedom equipment and all its commands.
+
+> **ACL**: `devices.delete`
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `equipment_id` | int | yes | Equipment ID (from `devices_list`) |
+
+**Returns**:
+
+```json
+{ "success": true, "equipment_id": 91 }
+```
+
+---
+
 ## `device_get_history`
 
 Query the recorded history of a Jeedom command (sensor values, power consumption, device states, etc.). Only works on historized info commands.
