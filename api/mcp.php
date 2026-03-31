@@ -74,6 +74,14 @@ function tool_error(string $message): array {
 
 function acl_allowed(string $domain, string $operation): bool {
     $mode = config::byKey('acl_mode', 'jeedomMCP', 'read_execute');
+
+    // Extension domains: accessible only in full/full_admin or custom (never in presets)
+    if (strncmp($domain, 'ext_', 4) === 0) {
+        if ($mode === 'full_admin' || $mode === 'full') return true;
+        if ($mode === 'custom') return config::byKey("acl_{$domain}_{$operation}", 'jeedomMCP', '0') == 1;
+        return false;
+    }
+
     switch ($mode) {
         case 'full_admin': return true;
         case 'full':       return strncmp($domain, 'admin', 5) !== 0;
@@ -176,7 +184,7 @@ switch ($rpc_method) {
 // ---------------------------------------------------------------------------
 
 function mcp_get_tools(): array {
-    return [
+    $tools = [
         [
             'name'        => 'devices_list',
             'description' => 'List all enabled Jeedom equipment with their current state and available actions. Use include_state=false or include_actions=false to reduce response size when only metadata is needed.',
@@ -629,6 +637,15 @@ function mcp_get_tools(): array {
             ],
         ],
     ];
+
+    foreach (ext_discover() as $ext) {
+        foreach ($ext['tools'] as $tool) {
+            $tool['name'] = 'ext_' . $ext['plugin_id'] . '_' . $tool['name'];
+            $tools[] = $tool;
+        }
+    }
+
+    return $tools;
 }
 
 // ---------------------------------------------------------------------------
@@ -673,11 +690,55 @@ function mcp_call_tool(string $name, array $args): array {
             case 'log_read':            return tool_result(tool_log_read((string)($args['log'] ?? ''), intval($args['lines'] ?? 100), intval($args['offset'] ?? 0), $args['min_level'] ?? null, $args['search'] ?? null));
             case 'updates_list':        return tool_result(tool_updates_list());
             case 'update_apply':        return tool_result(tool_update_apply((string)($args['logical_id'] ?? '')));
-            default:                    return tool_error('Unknown tool: ' . $name);
+            default:
+                if (strncmp($name, 'ext_', 4) === 0) return ext_call_tool($name, $args);
+                return tool_error('Unknown tool: ' . $name);
         }
     } catch (Exception $e) {
         return tool_error($e->getMessage());
     }
+}
+
+// ---------------------------------------------------------------------------
+// Plugin extension support
+// ---------------------------------------------------------------------------
+
+function ext_discover(): array {
+    $extensions = [];
+    ob_start();
+    $all_plugins = plugin::listPlugin(true);
+    ob_end_clean();
+    foreach ($all_plugins as $plugin) {
+        $plugin_id = $plugin->getId();
+        $file = __DIR__ . "/../../{$plugin_id}/mcp/McpExtension.php";
+        if (!file_exists($file)) continue;
+        require_once $file;
+        $class = $plugin_id . 'McpExtension';
+        if (!class_exists($class)) continue;
+        $tools = $class::getTools();
+        if (!is_array($tools) || empty($tools)) continue;
+        $extensions[] = ['plugin_id' => $plugin_id, 'class' => $class, 'tools' => $tools];
+    }
+    return $extensions;
+}
+
+function ext_call_tool(string $name, array $args): array {
+    // name format: ext_{pluginId}_{toolName}
+    $rest = substr($name, 4); // strip 'ext_'
+    $sep = strpos($rest, '_');
+    if ($sep === false) return tool_error('Invalid extension tool name: ' . $name);
+    $plugin_id = substr($rest, 0, $sep);
+    $tool_name = substr($rest, $sep + 1);
+
+    acl_check('ext_' . $plugin_id, 'execution');
+
+    $file = __DIR__ . "/../../{$plugin_id}/mcp/McpExtension.php";
+    if (!file_exists($file)) return tool_error("Extension not found for plugin: {$plugin_id}");
+    require_once $file;
+    $class = $plugin_id . 'McpExtension';
+    if (!class_exists($class)) return tool_error("Extension class not found: {$class}");
+
+    return tool_result($class::callTool($tool_name, $args));
 }
 
 // ---------------------------------------------------------------------------
@@ -795,6 +856,14 @@ function tool_acl_list(): array {
     $authorized = ['acl_list']; // always accessible
     foreach ($tool_map as $tool => $domain_op) {
         if (acl_allowed($domain_op[0], $domain_op[1])) $authorized[] = $tool;
+    }
+
+    foreach (ext_discover() as $ext) {
+        if (acl_allowed('ext_' . $ext['plugin_id'], 'execution')) {
+            foreach ($ext['tools'] as $tool) {
+                $authorized[] = 'ext_' . $ext['plugin_id'] . '_' . $tool['name'];
+            }
+        }
     }
 
     return ['mode' => $mode, 'authorized_tools' => $authorized];
