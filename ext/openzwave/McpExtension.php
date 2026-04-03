@@ -67,38 +67,28 @@ class openzwaveMcpExtension {
             ],
             [
                 'name'        => 'node_config_get',
-                'description' => 'Get all configuration parameters of a Z-Wave node (Command Class 112). Returns each parameter index with its current value, label, and allowed values for list-type parameters.',
+                'description' => 'Get all configuration parameters of a Z-Wave node (Command Class 112). Returns each parameter index with its current value, label, and allowed values for list-type parameters. Provide either node_id (Z-Wave node ID) or device_id (Jeedom equipment ID from devices_list).',
                 'inputSchema' => [
                     'type'       => 'object',
                     'properties' => [
-                        'node_id' => [
-                            'type'        => 'integer',
-                            'description' => 'The Z-Wave node ID.',
-                        ],
+                        'node_id'   => ['type' => 'integer', 'description' => 'The Z-Wave node ID (plugin_id from devices_list with with_plugin_info=true).'],
+                        'device_id' => ['type' => 'integer', 'description' => 'Jeedom equipment ID (id from devices_list). Resolved to the Z-Wave node ID automatically.'],
                     ],
-                    'required' => ['node_id'],
+                    'required' => [],
                 ],
             ],
             [
                 'name'        => 'node_config_set',
-                'description' => 'Set a configuration parameter on a Z-Wave node (Command Class 112). For sleeping devices the change will be applied on next wake-up.',
+                'description' => 'Set a configuration parameter on a Z-Wave node (Command Class 112). For sleeping devices the change will be applied on next wake-up. Provide either node_id (Z-Wave node ID) or device_id (Jeedom equipment ID from devices_list).',
                 'inputSchema' => [
                     'type'       => 'object',
                     'properties' => [
-                        'node_id' => [
-                            'type'        => 'integer',
-                            'description' => 'The Z-Wave node ID.',
-                        ],
-                        'index' => [
-                            'type'        => 'integer',
-                            'description' => 'The parameter index to set.',
-                        ],
-                        'value' => [
-                            'type'        => 'string',
-                            'description' => 'The value to set. Use the string representation (e.g. "1", "true", or the list label).',
-                        ],
+                        'node_id'   => ['type' => 'integer', 'description' => 'The Z-Wave node ID (plugin_id from devices_list with with_plugin_info=true).'],
+                        'device_id' => ['type' => 'integer', 'description' => 'Jeedom equipment ID (id from devices_list). Resolved to the Z-Wave node ID automatically.'],
+                        'index'     => ['type' => 'integer', 'description' => 'The parameter index to set.'],
+                        'value'     => ['type' => 'string',  'description' => 'The value to set (e.g. "1", "true", or the list label).'],
                     ],
-                    'required' => ['node_id', 'index', 'value'],
+                    'required' => ['index', 'value'],
                 ],
             ],
         ];
@@ -121,6 +111,21 @@ class openzwaveMcpExtension {
         if (!class_exists('openzwave')) {
             require_once __DIR__ . '/../../../openzwave/core/class/openzwave.class.php';
         }
+    }
+
+    private static function resolveNodeId(array $args): int {
+        if (!empty($args['node_id'])) {
+            return (int) $args['node_id'];
+        }
+        if (!empty($args['device_id'])) {
+            $eq = eqLogic::byId((int) $args['device_id']);
+            if (!is_object($eq)) throw new Exception('Device not found: ' . $args['device_id']);
+            if ($eq->getEqType_name() !== 'openzwave') throw new Exception('Device ' . $args['device_id'] . ' is not managed by openzwave.');
+            $logicalId = $eq->getLogicalId();
+            if (!$logicalId) throw new Exception('Device ' . $args['device_id'] . ' has no logical_id.');
+            return (int) $logicalId;
+        }
+        throw new Exception('Provide either node_id or device_id.');
     }
 
     private static function modeInclusion(array $args): array {
@@ -206,10 +211,7 @@ class openzwaveMcpExtension {
 
     private static function nodeConfigGet(array $args): array {
         static::loadClass();
-        $nodeId = (int) ($args['node_id'] ?? 0);
-        if ($nodeId <= 0) {
-            throw new Exception('node_id must be a positive integer.');
-        }
+        $nodeId = static::resolveNodeId($args);
         $result = openzwave::callOpenzwave('/node?node_id=' . $nodeId . '&instance_id=1&cc_id=112&type=data');
         $raw    = $result['result']['data'] ?? [];
 
@@ -232,12 +234,9 @@ class openzwaveMcpExtension {
 
     private static function nodeConfigSet(array $args): array {
         static::loadClass();
-        $nodeId = (int) ($args['node_id'] ?? 0);
+        $nodeId = static::resolveNodeId($args);
         $index  = (int) ($args['index']   ?? -1);
         $value  = (string) ($args['value'] ?? '');
-        if ($nodeId <= 0) {
-            throw new Exception('node_id must be a positive integer.');
-        }
         if ($index < 0) {
             throw new Exception('index must be a non-negative integer.');
         }
