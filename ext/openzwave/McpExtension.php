@@ -211,18 +211,34 @@ class openzwaveMcpExtension {
 
     private static function nodeConfigGet(array $args): array {
         static::loadClass();
-        $nodeId = static::resolveNodeId($args);
-        $result = openzwave::callOpenzwave('/node?node_id=' . $nodeId . '&instance_id=1&cc_id=112&type=data');
-        $raw    = $result['result']['data'] ?? [];
+        $nodeId  = static::resolveNodeId($args);
+        $result  = openzwave::callOpenzwave('/node?node_id=' . $nodeId . '&type=info&info=all');
+        // CC 112 = Configuration — look in any instance
+        $instances = $result['instances'] ?? $result['result']['instances'] ?? [];
+        $cc_data   = [];
+        foreach ($instances as $instance) {
+            if (isset($instance['commandClasses'][112]['data'])) {
+                foreach ($instance['commandClasses'][112]['data'] as $index => $entry) {
+                    if (!is_array($entry) || $index === 'updateTime') continue;
+                    $cc_data[(int) $index] = $entry;
+                }
+            }
+        }
 
         $params = [];
-        foreach ($raw as $index => $param) {
-            $val = $param['val'] ?? [];
-            $params[(int) $index] = [
-                'label'          => $val['value3'] ?? null,
-                'value'          => $val['value2'] ?? null,
-                'allowed_values' => !empty($val['value4']) ? $val['value4'] : null,
+        foreach ($cc_data as $index => $entry) {
+            $param = [
+                'label'     => $entry['name']  ?? null,
+                'help'      => $entry['help']  ?? null,
+                'type'      => $entry['typeZW'] ?? $entry['type'] ?? null,
+                'units'     => $entry['units'] !== '' ? ($entry['units'] ?? null) : null,
+                'value'     => $entry['val']   ?? null,
+                'read_only' => $entry['read_only'] ?? false,
             ];
+            if (!empty($entry['data_items'])) {
+                $param['allowed_values'] = $entry['data_items'];
+            }
+            $params[$index] = array_filter($param, fn($v) => $v !== null && $v !== false);
         }
         ksort($params);
 
