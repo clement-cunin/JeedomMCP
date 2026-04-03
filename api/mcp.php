@@ -187,7 +187,7 @@ function mcp_get_tools(): array {
     $tools = [
         [
             'name'        => 'devices_list',
-            'description' => 'List all enabled Jeedom equipment with their current state and available actions. Each device includes plugin_id (the plugin managing it) and logical_id (the plugin-internal identifier, e.g. the Z-Wave node ID for openzwave devices). Use include_state=false or include_actions=false to reduce response size when only metadata is needed.',
+            'description' => 'List all enabled Jeedom equipment with their current state and available actions. Use with_plugin_info=true to also get managed_by (plugin name, e.g. "openzwave") and plugin_id (plugin-internal identifier, e.g. the Z-Wave node ID). Use include_state=false or include_actions=false to reduce response size when only metadata is needed.',
             'inputSchema' => [
                 'type'       => 'object',
                 'properties' => [
@@ -201,6 +201,8 @@ function mcp_get_tools(): array {
                         'items'       => ['type' => 'integer'],
                         'description' => 'Filter by room — returns only equipment whose room_id is in this list.',
                     ],
+                    'managed_by'         => ['type' => 'string',  'description' => 'Filter by plugin name (e.g. "openzwave"). Only used when with_plugin_info=true.'],
+                    'with_plugin_info'   => ['type' => 'boolean', 'description' => 'If true, include managed_by (plugin name) and plugin_id (plugin-internal identifier) for each device. Default false.'],
                     'include_hidden'     => ['type' => 'boolean', 'description' => 'Include devices hidden in the Jeedom UI (is_visible=false). Default false.'],
                     'include_state'      => ['type' => 'boolean', 'description' => 'Include the state map for each device (default true).'],
                     'include_actions'    => ['type' => 'boolean', 'description' => 'Include the actions array for each device (default true).'],
@@ -656,7 +658,7 @@ function mcp_call_tool(string $name, array $args): array {
     try {
         switch ($name) {
             case 'acl_list':            return tool_result(tool_acl_list());
-            case 'devices_list':        return tool_result(tool_devices_list($args['categories'] ?? null, $args['room_ids'] ?? null, intval($args['limit'] ?? 50), intval($args['offset'] ?? 0), isset($args['include_state']) ? (bool)$args['include_state'] : true, isset($args['include_actions']) ? (bool)$args['include_actions'] : true, isset($args['include_hidden']) ? (bool)$args['include_hidden'] : false, isset($args['include_historical']) ? (bool)$args['include_historical'] : false));
+            case 'devices_list':        return tool_result(tool_devices_list($args['categories'] ?? null, $args['room_ids'] ?? null, intval($args['limit'] ?? 50), intval($args['offset'] ?? 0), isset($args['include_state']) ? (bool)$args['include_state'] : true, isset($args['include_actions']) ? (bool)$args['include_actions'] : true, isset($args['include_hidden']) ? (bool)$args['include_hidden'] : false, isset($args['include_historical']) ? (bool)$args['include_historical'] : false, isset($args['with_plugin_info']) ? (bool)$args['with_plugin_info'] : false, isset($args['managed_by']) ? (string)$args['managed_by'] : null));
             case 'device_set_description': return tool_result(tool_device_set_description((int)($args['equipment_id'] ?? 0), (string)($args['description'] ?? '')));
             case 'device_update':       return tool_result(tool_device_update((int)($args['equipment_id'] ?? 0), $args));
             case 'device_delete':       return tool_result(tool_device_delete((int)($args['equipment_id'] ?? 0)));
@@ -881,7 +883,7 @@ function tool_acl_list(): array {
     return ['mode' => $mode, 'authorized_tools' => $authorized];
 }
 
-function tool_devices_list(?array $categories = null, ?array $room_ids = null, int $limit = 50, int $offset = 0, bool $include_state = true, bool $include_actions = true, bool $include_hidden = false, bool $include_historical = false): array {
+function tool_devices_list(?array $categories = null, ?array $room_ids = null, int $limit = 50, int $offset = 0, bool $include_state = true, bool $include_actions = true, bool $include_hidden = false, bool $include_historical = false, bool $with_plugin_info = false, ?string $managed_by = null): array {
     acl_check('devices', 'read');
 
     $room_ids_int = null;
@@ -908,8 +910,14 @@ function tool_devices_list(?array $categories = null, ?array $room_ids = null, i
         if ($eq->getObject_id())    $item['room_id']     = intval($eq->getObject_id());
         if (!empty($eq_cats))       $item['categories']  = $eq_cats;
         if ($eq->getIsVisible() != 1) $item['is_visible'] = false;
-        if ($eq->getEqType_name())  $item['plugin_id']   = $eq->getEqType_name();
-        if ($eq->getLogicalId())    $item['logical_id']  = $eq->getLogicalId();
+        if ($with_plugin_info) {
+            $eq_plugin = $eq->getEqType_name();
+            if ($managed_by !== null && $eq_plugin !== $managed_by) continue;
+            if ($eq_plugin)           $item['managed_by'] = $eq_plugin;
+            if ($eq->getLogicalId()) $item['plugin_id']  = $eq->getLogicalId();
+        } elseif ($managed_by !== null && $eq->getEqType_name() !== $managed_by) {
+            continue;
+        }
         $cmds = $commands_by_eq[$eq->getId()] ?? [];
         if ($include_state)   $item['state']   = fmt_state_map($cmds);
         if ($include_actions) $item['actions']  = fmt_actions($cmds);
