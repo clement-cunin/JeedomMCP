@@ -148,3 +148,52 @@ Force-remove a dead or burned-out Z-Wave node that can no longer be excluded nor
 ```json
 { "success": false, "node_id": 5, "message": "Node 5 is not marked as failed by the controller. Use mode_exclusion to remove it normally." }
 ```
+
+---
+
+### `ext_openzwave_node_config_get`
+
+Get all configuration parameters of a Z-Wave node (Command Class 112). Returns each parameter with its index, label, current value, and allowed values for list-type parameters.
+
+> **ACL**: `ext_openzwave.execution`
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `node_id` | integer | yes | The Z-Wave node ID. |
+
+**Returns**:
+
+```json
+{
+  "node_id": 5,
+  "params": {
+    "1": { "label": "Motion sensitivity", "value": 8, "allowed_values": null },
+    "2": { "label": "Motion blind time", "value": 15, "allowed_values": null },
+    "24": { "label": "Operating mode", "value": "Default", "allowed_values": ["Default", "Always On", "Night mode"] }
+  }
+}
+```
+
+---
+
+### `ext_openzwave_node_config_set`
+
+Set a configuration parameter on a Z-Wave node (Command Class 112). For sleeping devices the change is queued and applied on next wake-up.
+
+> **ACL**: `ext_openzwave.execution`
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `node_id` | integer | yes | The Z-Wave node ID. |
+| `index` | integer | yes | The parameter index to set. |
+| `value` | string | yes | The value to set (e.g. `"1"`, `"true"`, or the list label). |
+
+**Returns**:
+
+```json
+{ "success": true, "node_id": 5, "index": 1, "value": "10", "message": "Configuration parameter 1 set on node 5. Sleeping devices will apply the change on next wake-up." }
+```

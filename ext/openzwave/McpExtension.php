@@ -65,6 +65,42 @@ class openzwaveMcpExtension {
                     'required' => ['node_id'],
                 ],
             ],
+            [
+                'name'        => 'node_config_get',
+                'description' => 'Get all configuration parameters of a Z-Wave node (Command Class 112). Returns each parameter index with its current value, label, and allowed values for list-type parameters.',
+                'inputSchema' => [
+                    'type'       => 'object',
+                    'properties' => [
+                        'node_id' => [
+                            'type'        => 'integer',
+                            'description' => 'The Z-Wave node ID.',
+                        ],
+                    ],
+                    'required' => ['node_id'],
+                ],
+            ],
+            [
+                'name'        => 'node_config_set',
+                'description' => 'Set a configuration parameter on a Z-Wave node (Command Class 112). For sleeping devices the change will be applied on next wake-up.',
+                'inputSchema' => [
+                    'type'       => 'object',
+                    'properties' => [
+                        'node_id' => [
+                            'type'        => 'integer',
+                            'description' => 'The Z-Wave node ID.',
+                        ],
+                        'index' => [
+                            'type'        => 'integer',
+                            'description' => 'The parameter index to set.',
+                        ],
+                        'value' => [
+                            'type'        => 'string',
+                            'description' => 'The value to set. Use the string representation (e.g. "1", "true", or the list label).',
+                        ],
+                    ],
+                    'required' => ['node_id', 'index', 'value'],
+                ],
+            ],
         ];
     }
 
@@ -75,6 +111,8 @@ class openzwaveMcpExtension {
             case 'cancel':           return static::cancel();
             case 'health':           return static::health();
             case 'node_remove_failed': return static::nodeRemoveFailed($args);
+            case 'node_config_get':  return static::nodeConfigGet($args);
+            case 'node_config_set':  return static::nodeConfigSet($args);
             default:                 throw new Exception("Unknown tool: {$name}");
         }
     }
@@ -163,6 +201,57 @@ class openzwaveMcpExtension {
             'success' => true,
             'node_id' => $nodeId,
             'message' => 'Force-remove of node ' . $nodeId . ' sent to the controller.',
+        ];
+    }
+
+    private static function nodeConfigGet(array $args): array {
+        static::loadClass();
+        $nodeId = (int) ($args['node_id'] ?? 0);
+        if ($nodeId <= 0) {
+            throw new Exception('node_id must be a positive integer.');
+        }
+        $result = openzwave::callOpenzwave('/node?node_id=' . $nodeId . '&instance_id=1&cc_id=112&type=data');
+        $raw    = $result['result']['data'] ?? [];
+
+        $params = [];
+        foreach ($raw as $index => $param) {
+            $val = $param['val'] ?? [];
+            $params[(int) $index] = [
+                'label'          => $val['value3'] ?? null,
+                'value'          => $val['value2'] ?? null,
+                'allowed_values' => !empty($val['value4']) ? $val['value4'] : null,
+            ];
+        }
+        ksort($params);
+
+        return [
+            'node_id' => $nodeId,
+            'params'  => $params,
+        ];
+    }
+
+    private static function nodeConfigSet(array $args): array {
+        static::loadClass();
+        $nodeId = (int) ($args['node_id'] ?? 0);
+        $index  = (int) ($args['index']   ?? -1);
+        $value  = (string) ($args['value'] ?? '');
+        if ($nodeId <= 0) {
+            throw new Exception('node_id must be a positive integer.');
+        }
+        if ($index < 0) {
+            throw new Exception('index must be a non-negative integer.');
+        }
+        openzwave::callOpenzwave(
+            '/node?node_id=' . $nodeId .
+            '&instance_id=0&cc_id=112&index=' . $index .
+            '&type=setconfig&value=' . urlencode($value) . '&size=0'
+        );
+        return [
+            'success' => true,
+            'node_id' => $nodeId,
+            'index'   => $index,
+            'value'   => $value,
+            'message' => 'Configuration parameter ' . $index . ' set on node ' . $nodeId . '. Sleeping devices will apply the change on next wake-up.',
         ];
     }
 }
