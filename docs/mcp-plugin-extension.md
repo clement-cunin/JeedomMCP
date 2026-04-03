@@ -1,14 +1,31 @@
 # JeedomMCP Plugin Extension Standard
 
-This document describes how any Jeedom plugin can expose its own MCP tools through JeedomMCP.
+This document describes how any Jeedom plugin can expose its own MCP tools through JeedomMCP — either natively (implemented by the plugin author) or via an embedded extension shipped with JeedomMCP.
 
-## Overview
+## Two ways to make a plugin MCP-compatible
 
-JeedomMCP scans all active plugins at runtime for an extension file. If found, the plugin's tools are automatically included in the MCP `tools/list` response and routed by JeedomMCP when called.
+### 1. Native extension (by the plugin author)
 
-## Creating an extension
+The plugin author creates `plugins/{pluginId}/mcp/McpExtension.php` directly in their plugin. This is the recommended approach for long-term ownership and customization.
 
-Create the file `plugins/{pluginId}/mcp/McpExtension.php` with a class named `{PluginId}McpExtension` implementing two static methods:
+### 2. Embedded extension (shipped with JeedomMCP)
+
+JeedomMCP ships built-in extensions for popular plugins that don't yet implement the standard natively. These live in `plugins/jeedomMCP/ext/{pluginId}/McpExtension.php`.
+
+**Any plugin can be MCP-compatible** — even without any change from the plugin author — as long as an embedded extension exists for it.
+
+### Discovery priority
+
+For each active plugin, JeedomMCP checks in order:
+
+1. `plugins/{pluginId}/mcp/McpExtension.php` — native extension (always takes precedence)
+2. `plugins/jeedomMCP/ext/{pluginId}/McpExtension.php` — embedded extension
+
+---
+
+## Creating a native extension
+
+Create `plugins/{pluginId}/mcp/McpExtension.php` with a class named `{PluginId}McpExtension` implementing two static methods:
 
 ```php
 <?php
@@ -49,15 +66,31 @@ class MyPluginMcpExtension {
 }
 ```
 
+---
+
+## Taking ownership of an embedded extension
+
+> **Note for plugin authors**
+>
+> If JeedomMCP already ships an embedded extension for your plugin (see `ext/` directory), you can take full ownership of it at any time:
+>
+> 1. Copy `plugins/jeedomMCP/ext/{pluginId}/McpExtension.php` into your plugin at `plugins/{pluginId}/mcp/McpExtension.php`
+> 2. Rename the class from `{PluginId}McpExtension` if needed (must match `{yourPluginId}McpExtension`)
+> 3. Ship it with your plugin
+>
+> Your native extension will automatically take precedence over the embedded one — no configuration needed. You can then evolve it independently, add more tools, and improve descriptions without any dependency on JeedomMCP.
+
+---
+
 ## Naming convention
 
 JeedomMCP prefixes all extension tool names with `ext_{pluginId}_` automatically:
 
-| What you declare in `getTools()` | What appears in MCP `tools/list` |
+| Declared in `getTools()` | Exposed in MCP `tools/list` |
 |---|---|
 | `scan_devices` | `ext_myPlugin_scan_devices` |
 
-The same prefix is stripped before `callTool()` is called, so your implementation always receives the unprefixed name.
+The prefix is stripped before `callTool()` is called — your implementation always receives the unprefixed name.
 
 ## Access control
 
@@ -71,10 +104,6 @@ Extension tools are gated behind the `ext_{pluginId}.execution` ACL domain:
 | `full_admin` | accessible |
 | `custom` | per-plugin toggle in the configuration page |
 
-In **Custom** mode, each installed extension appears as a row in the JeedomMCP configuration page under **Tool permissions**, with a toggle for the `execution` operation.
-
 ## Discovery
 
-JeedomMCP scans for extension files on every `tools/list` and `tools/call` request. There is no persistent cache — the scan is lightweight (file existence check per active plugin).
-
-Active plugins are those with status `active=1` in Jeedom (`plugin::listPlugin(true)`).
+JeedomMCP scans for extension files on every `tools/list` and `tools/call` request. Only active plugins are scanned (`plugin::listPlugin(true)`).

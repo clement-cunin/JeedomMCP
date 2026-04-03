@@ -2,6 +2,30 @@
 if (!isConnect('admin')) {
     throw new Exception('{{401 - Unauthorized access}}');
 }
+
+// Discover extensions (native and embedded) for all active plugins
+ob_start();
+$_all_plugins = plugin::listPlugin(true);
+ob_end_clean();
+
+$discovered_extensions = [];
+foreach ($_all_plugins as $_p) {
+    $_pid           = $_p->getId();
+    if ($_pid === 'jeedomMCP') continue;
+    $_native_file   = __DIR__ . "/../../{$_pid}/mcp/McpExtension.php";
+    $_embedded_file = __DIR__ . "/../ext/{$_pid}/McpExtension.php";
+    $_has_native    = file_exists($_native_file);
+    $_has_embedded  = file_exists($_embedded_file);
+    if (!$_has_native && !$_has_embedded) continue;
+    $_file  = $_has_native ? $_native_file : $_embedded_file;
+    $_type  = $_has_native ? 'native' : 'embedded';
+    require_once $_file;
+    $_class = $_pid . 'McpExtension';
+    if (!class_exists($_class)) continue;
+    $_tools = $_class::getTools();
+    if (!is_array($_tools) || empty($_tools)) continue;
+    $discovered_extensions[] = ['plugin_id' => $_pid, 'type' => $_type, 'tools' => $_tools];
+}
 $mcpUrl = network::getNetworkAccess('external', 'proto:ip:port:comp') . '/plugins/jeedomMCP/api/mcp.php';
 
 // One-time admin token valid 5 minutes (avoids relying on session in api/ context)
@@ -183,23 +207,16 @@ $acl_tools = [
                             <?php endforeach; ?>
                         </tr>
                         <?php endforeach; ?>
-                    <?php
-                    // Dynamic rows for plugin extensions
-                    foreach (plugin::listPlugin(true) as $p) {
-                        $pid = $p->getId();
-                        if ($pid === 'jeedomMCP') continue;
-                        $ext_file = __DIR__ . "/../../{$pid}/mcp/McpExtension.php";
-                        if (!file_exists($ext_file)) continue;
+                    <?php foreach ($discovered_extensions as $ext):
+                        $pid = $ext['plugin_id'];
                         $key = "acl_ext_{$pid}_execution";
                         $current = (string)config::byKey($key, 'jeedomMCP');
                         if (!in_array($current, ['0', '1'], true)) {
                             config::save($key, '0', 'jeedomMCP');
                         }
-                        ?>
+                    ?>
                         <tr data-ext="1">
-                            <th style="vertical-align:top;padding-top:10px">
-                                <?php echo '{{Extensions}} — ' . htmlspecialchars($pid); ?>
-                            </th>
+                            <th style="vertical-align:top;padding-top:10px"><?php echo '{{Extensions}} — ' . htmlspecialchars($pid); ?></th>
                             <?php foreach (array_keys($acl_op_labels) as $op): ?>
                             <td class="text-center">
                                 <?php if ($op === 'execution'): ?>
@@ -214,11 +231,56 @@ $acl_tools = [
                             </td>
                             <?php endforeach; ?>
                         </tr>
-                        <?php
-                    }
-                    ?>
+                    <?php endforeach; ?>
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <legend><i class="fas fa-puzzle-piece"></i> {{Discovered extensions}}</legend>
+
+        <div class="form-group">
+            <div class="col-sm-offset-4 col-sm-8">
+                <?php if (empty($discovered_extensions)): ?>
+                <p class="text-muted">{{No extensions discovered. Extensions are loaded from plugins/{pluginId}/mcp/McpExtension.php (native) or plugins/jeedomMCP/ext/{pluginId}/McpExtension.php (embedded).}}</p>
+                <?php else: ?>
+                <table class="table table-bordered table-condensed" style="width:auto">
+                    <thead>
+                        <tr>
+                            <th>{{Plugin}}</th>
+                            <th>{{Type}}</th>
+                            <th>{{Tools}}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($discovered_extensions as $ext):
+                            $pid = htmlspecialchars($ext['plugin_id']);
+                            $config_url = 'index.php?v=d&p=plugin&id=' . urlencode($ext['plugin_id']);
+                        ?>
+                        <tr>
+                            <th style="vertical-align:top;padding-top:10px">
+                                <?php echo $pid; ?>
+                                <a href="<?php echo $config_url; ?>" title="{{Open plugin configuration}}" style="margin-left:6px">
+                                    <i class="fas fa-cog"></i>
+                                </a>
+                            </th>
+                            <td style="vertical-align:top;padding-top:10px">
+                                <?php if ($ext['type'] === 'native'): ?>
+                                <span class="label label-success">{{Native}}</span>
+                                <?php else: ?>
+                                <span class="label label-info">{{Embedded}}</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php foreach ($ext['tools'] as $tool): ?>
+                                <div><small class="text-muted" style="font-family:monospace">ext_<?php echo $pid; ?>_<?php echo htmlspecialchars($tool['name']); ?></small></div>
+                                <?php endforeach; ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <?php endif; ?>
             </div>
         </div>
 

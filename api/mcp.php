@@ -703,6 +703,18 @@ function mcp_call_tool(string $name, array $args): array {
 // Plugin extension support
 // ---------------------------------------------------------------------------
 
+/**
+ * Resolves the McpExtension.php file for a plugin.
+ * Priority: plugin's own extension > JeedomMCP embedded extension.
+ */
+function ext_find_file(string $plugin_id): ?string {
+    $native   = __DIR__ . "/../../{$plugin_id}/mcp/McpExtension.php";
+    $embedded = __DIR__ . "/../ext/{$plugin_id}/McpExtension.php";
+    if (file_exists($native))   return $native;
+    if (file_exists($embedded)) return $embedded;
+    return null;
+}
+
 function ext_discover(): array {
     $extensions = [];
     ob_start();
@@ -710,8 +722,8 @@ function ext_discover(): array {
     ob_end_clean();
     foreach ($all_plugins as $plugin) {
         $plugin_id = $plugin->getId();
-        $file = __DIR__ . "/../../{$plugin_id}/mcp/McpExtension.php";
-        if (!file_exists($file)) continue;
+        $file = ext_find_file($plugin_id);
+        if ($file === null) continue;
         require_once $file;
         $class = $plugin_id . 'McpExtension';
         if (!class_exists($class)) continue;
@@ -732,8 +744,8 @@ function ext_call_tool(string $name, array $args): array {
 
     acl_check('ext_' . $plugin_id, 'execution');
 
-    $file = __DIR__ . "/../../{$plugin_id}/mcp/McpExtension.php";
-    if (!file_exists($file)) return tool_error("Extension not found for plugin: {$plugin_id}");
+    $file = ext_find_file($plugin_id);
+    if ($file === null) return tool_error("Extension not found for plugin: {$plugin_id}");
     require_once $file;
     $class = $plugin_id . 'McpExtension';
     if (!class_exists($class)) return tool_error("Extension class not found: {$class}");
