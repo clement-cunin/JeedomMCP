@@ -908,7 +908,7 @@ function tool_devices_list(?array $categories = null, ?array $room_ids = null, i
         if ($eq->getObject_id())    $item['room_id']     = intval($eq->getObject_id());
         if (!empty($eq_cats))       $item['categories']  = $eq_cats;
         if ($eq->getIsVisible() != 1) $item['is_visible'] = false;
-        if ($eq->getEqType())       $item['plugin_id']   = $eq->getEqType();
+        if ($eq->getEqType_name())  $item['plugin_id']   = $eq->getEqType_name();
         if ($eq->getLogicalId())    $item['logical_id']  = $eq->getLogicalId();
         $cmds = $commands_by_eq[$eq->getId()] ?? [];
         if ($include_state)   $item['state']   = fmt_state_map($cmds);
