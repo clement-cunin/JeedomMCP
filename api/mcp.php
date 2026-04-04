@@ -227,7 +227,7 @@ function mcp_get_tools(): array {
         ],
         [
             'name'        => 'device_update',
-            'description' => 'Update a device\'s metadata: name, room assignment, and/or categories. Only provided fields are modified.',
+            'description' => 'Update a device\'s metadata: name, room assignment, categories, and/or visibility. Only provided fields are modified.',
             'inputSchema' => [
                 'type'       => 'object',
                 'properties' => [
@@ -239,6 +239,7 @@ function mcp_get_tools(): array {
                         'description' => 'List of category keys to assign. Replaces existing categories.',
                         'items'       => ['type' => 'string', 'enum' => ['heating', 'security', 'energy', 'light', 'opening', 'automatism', 'multimedia', 'default']],
                     ],
+                    'is_visible'   => ['type' => 'boolean', 'description' => 'Whether the device is visible in the Jeedom UI. Set to true to show a newly synced device.'],
                 ],
                 'required' => ['equipment_id'],
             ],
@@ -989,6 +990,9 @@ function tool_device_update(int $equipment_id, array $args): array {
         foreach ($valid_categories as $key) {
             $eq->setCategory($key, in_array($key, $cats, true) ? 1 : 0);
         }
+    }
+    if (array_key_exists('is_visible', $args)) {
+        $eq->setIsVisible((bool)$args['is_visible'] ? 1 : 0);
     }
     $eq->save();
     return fmt_equipment($eq);
