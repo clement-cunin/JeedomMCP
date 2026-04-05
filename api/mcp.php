@@ -1471,17 +1471,26 @@ function tool_plugin_set_config(string $plugin_id, ?string $log_level, ?bool $da
         }
         $changed['log_level'] = $log_level;
     }
+    $warnings = [];
     if ($daemon_auto_restart !== null) {
-        if (!$plugin->getHasOwnDeamon()) throw new Exception('Plugin ' . $plugin_id . ' has no daemon');
-        $plugin->deamon_changeAutoMode($daemon_auto_restart ? 1 : 0);
-        $changed['daemon_auto_restart'] = $daemon_auto_restart;
+        if (!$plugin->getHasOwnDeamon()) {
+            $warnings[] = 'Plugin has no daemon — daemon_auto_restart has no effect';
+        } else {
+            $plugin->deamon_changeAutoMode($daemon_auto_restart ? 1 : 0);
+            $changed['daemon_auto_restart'] = $daemon_auto_restart;
+        }
     }
     if ($dependency_auto_install !== null) {
-        if (!$plugin->getHasDependency()) throw new Exception('Plugin ' . $plugin_id . ' has no dependencies');
-        $plugin->dependancy_changeAutoMode($dependency_auto_install ? 1 : 0);
-        $changed['dependency_auto_install'] = $dependency_auto_install;
+        if (!$plugin->getHasDependency()) {
+            $warnings[] = 'Plugin has no dependencies — dependency_auto_install has no effect';
+        } else {
+            $plugin->dependancy_changeAutoMode($dependency_auto_install ? 1 : 0);
+            $changed['dependency_auto_install'] = $dependency_auto_install;
+        }
     }
-    return array_merge(['success' => true, 'plugin_id' => $plugin_id], $changed);
+    $result = array_merge(['success' => true, 'plugin_id' => $plugin_id], $changed);
+    if (!empty($warnings)) $result['warnings'] = $warnings;
+    return $result;
 }
 
 function tool_plugin_set_plugin_config(string $plugin_id, array $config): array {
