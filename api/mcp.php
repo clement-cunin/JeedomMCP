@@ -588,7 +588,7 @@ function mcp_get_tools(): array {
         ],
         [
             'name'        => 'logs_list',
-            'description' => 'List available Jeedom log files with their size and last modification date.',
+            'description' => 'List available Jeedom log files with their size, last modification date, format ("jeedom" = structured, supports min_level; "raw" = unstructured, use search instead), and highest log level seen.',
             'inputSchema' => ['type' => 'object', 'properties' => new stdClass(), 'required' => []],
         ],
         [
@@ -1611,6 +1611,23 @@ function log_max_level(string $path): ?string {
     return $max_name;
 }
 
+function log_detect_format(string $path): string {
+    $handle = fopen($path, 'r');
+    if (!$handle) return 'raw';
+    $checked = 0;
+    while (($line = fgets($handle)) !== false && $checked < 5) {
+        $line = trim($line);
+        if ($line === '') continue;
+        if (preg_match('/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]\[/', $line)) {
+            fclose($handle);
+            return 'jeedom';
+        }
+        $checked++;
+    }
+    fclose($handle);
+    return 'raw';
+}
+
 function tool_logs_list(): array {
     acl_check('admin_logs', 'read');
     $result = [];
@@ -1620,6 +1637,7 @@ function tool_logs_list(): array {
         if (file_exists($path)) {
             $item['size']      = filesize($path);
             $item['modified']  = date('Y-m-d H:i:s', filemtime($path));
+            $item['format']    = log_detect_format($path);
             $item['max_level'] = log_max_level($path);
         }
         $result[] = $item;
@@ -1634,6 +1652,12 @@ function tool_log_read(string $log, int $lines = 100, int $offset = 0, ?string $
     $path = log::getPathToLog($log);
     if (!file_exists($path)) throw new Exception("Log '{$log}' not found");
     $min_rank = ($min_level !== null) ? ($LOG_LEVELS[strtoupper($min_level)] ?? 0) : -1;
+    $format   = log_detect_format($path);
+    $warning  = null;
+    if ($min_rank >= 0 && $format === 'raw') {
+        $warning  = "min_level filter not applied — unstructured log format (raw). Use the search parameter for text filtering instead.";
+        $min_rank = -1;
+    }
     $all = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     if ($min_rank >= 0) {
         $all = array_values(array_filter($all, function ($line) use ($min_rank) {
@@ -1652,12 +1676,14 @@ function tool_log_read(string $log, int $lines = 100, int $offset = 0, ?string $
     $total = count($all);
     // Paginate from the end: offset skips lines from the end, then take $lines
     $slice = array_values(array_slice($all, -($offset + $lines), $lines));
-    return [
+    $result = [
         'log'    => $log,
         'total'  => $total,
         'offset' => $offset,
-        'lines'  => $slice,
     ];
+    if ($warning !== null) $result['warning'] = $warning;
+    $result['lines'] = $slice;
+    return $result;
 }
 
 function tool_updates_list(): array {
