@@ -197,3 +197,111 @@ Set a configuration parameter on a Z-Wave node (Command Class 112). For sleeping
 ```json
 { "success": true, "node_id": 5, "index": 1, "value": "10", "message": "Configuration parameter 1 set on node 5. Sleeping devices will apply the change on next wake-up." }
 ```
+
+---
+
+## JeedomConnect
+
+### `ext_JeedomConnect_devices_list`
+
+List all JeedomConnect instances and their paired mobile devices.
+
+> **ACL**: `ext_JeedomConnect.execution`
+
+**Parameters**: none
+
+**Returns**:
+
+```json
+{
+  "count": 1,
+  "devices": [
+    {
+      "equipment_id": 74,
+      "name": "Clément",
+      "is_enable": true,
+      "device_name": "Pixel 8",
+      "platform": "android",
+      "last_seen": 1743800000,
+      "app_state": "active",
+      "has_token": true
+    }
+  ]
+}
+```
+
+---
+
+### `ext_JeedomConnect_notifications_list`
+
+List available push notification configurations for a JeedomConnect instance. Use this to discover `notification_id` values before calling `send_notification`.
+
+> **ACL**: `ext_JeedomConnect.execution`
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `equipment_id` | integer | yes | Equipment ID from `devices_list`. |
+
+**Returns**:
+
+```json
+{
+  "equipment_id": 74,
+  "notifications": [
+    { "id": "defaultNotif", "name": "Notification", "channel": "default" },
+    { "id": "alertNotif",   "name": "Alerte",        "channel": "high"    }
+  ]
+}
+```
+
+---
+
+### `ext_JeedomConnect_send_notification`
+
+Send a push notification to a JeedomConnect mobile device.
+
+> **ACL**: `ext_JeedomConnect.execution`
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `equipment_id` | integer | yes | Equipment ID from `devices_list`. |
+| `message` | string | yes | Notification message body. |
+| `notification_id` | string | no | Notification config ID from `notifications_list`. Defaults to `"defaultNotif"`. |
+| `title` | string | no | Notification title override. |
+
+**Returns**:
+
+```json
+{ "success": true, "equipment_id": 74, "notification_id": "defaultNotif", "message": "La lumière du salon est allumée depuis 2h." }
+```
+
+---
+
+### `ext_JeedomConnect_get_geofences`
+
+Return configured geofences for a JeedomConnect instance with the current inside/outside status of the paired device.
+
+> **ACL**: `ext_JeedomConnect.execution`
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `equipment_id` | integer | yes | Equipment ID from `devices_list`. |
+
+**Returns**:
+
+```json
+{
+  "equipment_id": 74,
+  "count": 2,
+  "geofences": [
+    { "identifier": "Home", "name": "Maison", "latitude": 48.8566, "longitude": 2.3522, "radius_m": 200.0, "inside": true },
+    { "identifier": "Work", "name": "Bureau", "latitude": 48.8600, "longitude": 2.3400, "radius_m": 500.0, "inside": false }
+  ]
+}
+```
