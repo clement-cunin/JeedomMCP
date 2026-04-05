@@ -52,6 +52,17 @@ class JeedomConnectMcpExtension {
                 ],
             ],
             [
+                'name'        => 'config_get',
+                'description' => 'Return the interface layout of a JeedomConnect instance: tabs, sections, and the list of widgets per section (id, type, name only). Use this to explore what is displayed on the mobile app without the internal command details.',
+                'inputSchema' => [
+                    'type'       => 'object',
+                    'properties' => [
+                        'equipment_id' => ['type' => 'integer', 'description' => 'Jeedom equipment ID of the JeedomConnect instance (from devices_list).'],
+                    ],
+                    'required' => ['equipment_id'],
+                ],
+            ],
+            [
                 'name'        => 'get_geofences',
                 'description' => 'Return configured geofences for a JeedomConnect instance with the current inside/outside status of the paired device.',
                 'inputSchema' => [
@@ -70,6 +81,7 @@ class JeedomConnectMcpExtension {
             case 'devices_list':       return static::devicesList();
             case 'notifications_list': return static::notificationsList((int)($args['equipment_id'] ?? 0));
             case 'send_notification':  return static::sendNotification($args);
+            case 'config_get':         return static::configGet((int)($args['equipment_id'] ?? 0));
             case 'get_geofences':      return static::getGeofences((int)($args['equipment_id'] ?? 0));
             default:                   throw new Exception("Unknown tool: {$name}");
         }
@@ -157,6 +169,90 @@ class JeedomConnectMcpExtension {
             'equipment_id'    => $equipmentId,
             'notification_id' => $notificationId,
             'message'         => $message,
+        ];
+    }
+
+    private static function configGet(int $equipmentId): array {
+        static::loadClass();
+        $eq     = static::getEqLogic($equipmentId);
+        $config = $eq->getConfig();
+        $payload = $config['payload'] ?? [];
+
+        // Index sections by id
+        $sections = [];
+        foreach ($payload['sections'] ?? [] as $s) {
+            $sections[$s['id']] = [
+                'id'      => $s['id'],
+                'name'    => $s['name'] ?? '',
+                'index'   => $s['index'] ?? 0,
+                'widgets' => [],
+            ];
+        }
+
+        // Index widgets by their section (parentId)
+        // Use generated config to get type and name
+        $generated  = $eq->getGeneratedConfigFile() ?? [];
+        $gen_payload = $generated['payload'] ?? $payload;
+        $widget_map  = [];
+        foreach ($gen_payload['widgets'] ?? [] as $w) {
+            $widget_map[$w['widgetId'] ?? $w['id']] = $w;
+        }
+
+        foreach ($payload['widgets'] ?? [] as $w) {
+            $parentId = $w['parentId'] ?? null;
+            if ($parentId === null || !isset($sections[$parentId])) continue;
+            $enriched = $widget_map[$w['widgetId'] ?? $w['id']] ?? $w;
+            $sections[$parentId]['widgets'][] = [
+                'id'    => $w['widgetId'] ?? $w['id'],
+                'type'  => $enriched['type'] ?? null,
+                'name'  => $enriched['name'] ?? null,
+                'index' => $w['index'] ?? 0,
+            ];
+        }
+
+        // Sort widgets by index within each section
+        foreach ($sections as &$s) {
+            usort($s['widgets'], fn($a, $b) => $a['index'] <=> $b['index']);
+            unset($s['index']); // cleanup internal field
+        }
+        unset($s);
+
+        // Build tabs with their sections
+        $tabs = [];
+        foreach ($payload['tabs'] ?? [] as $t) {
+            $tabs[] = [
+                'id'       => $t['id'],
+                'name'     => $t['name'] ?? '',
+                'index'    => $t['index'] ?? 0,
+                'sections' => [],
+            ];
+        }
+
+        // Sections have parentId pointing to a tab
+        $tab_map = [];
+        foreach ($tabs as &$t) { $tab_map[$t['id']] = &$t; }
+        unset($t);
+
+        foreach ($payload['sections'] ?? [] as $s) {
+            $tabId = $s['parentId'] ?? null;
+            if ($tabId !== null && isset($tab_map[$tabId])) {
+                $sec = $sections[$s['id']];
+                $tab_map[$tabId]['sections'][] = $sec;
+            }
+        }
+
+        // Sort tabs and sections by index
+        usort($tabs, fn($a, $b) => $a['index'] <=> $b['index']);
+        foreach ($tabs as &$t) {
+            usort($t['sections'], fn($a, $b) => ($a['index'] ?? 0) <=> ($b['index'] ?? 0));
+            unset($t['index']);
+        }
+        unset($t);
+
+        return [
+            'equipment_id'   => $equipmentId,
+            'config_version' => $payload['configVersion'] ?? null,
+            'tabs'           => $tabs,
         ];
     }
 
