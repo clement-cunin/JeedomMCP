@@ -53,11 +53,12 @@ class JeedomConnectMcpExtension {
             ],
             [
                 'name'        => 'config_get',
-                'description' => 'Return the interface layout of a JeedomConnect instance: tabs, sections, and the list of widgets per section (id, type, name only). Use this to explore what is displayed on the mobile app without the internal command details.',
+                'description' => 'Return the interface layout of a JeedomConnect instance: tabs, sections, and the list of widgets per section (id, type, name only). Pass include_params=true to also get the raw widget fields (e.g. command IDs) — use this before calling widget_add.',
                 'inputSchema' => [
                     'type'       => 'object',
                     'properties' => [
-                        'equipment_id' => ['type' => 'integer', 'description' => 'Jeedom equipment ID of the JeedomConnect instance (from devices_list).'],
+                        'equipment_id'   => ['type' => 'integer', 'description' => 'Jeedom equipment ID of the JeedomConnect instance (from devices_list).'],
+                        'include_params' => ['type' => 'boolean', 'description' => 'If true, include all raw widget fields (command IDs, params). Default false.'],
                     ],
                     'required' => ['equipment_id'],
                 ],
@@ -81,7 +82,7 @@ class JeedomConnectMcpExtension {
             case 'devices_list':       return static::devicesList();
             case 'notifications_list': return static::notificationsList((int)($args['equipment_id'] ?? 0));
             case 'send_notification':  return static::sendNotification($args);
-            case 'config_get':         return static::configGet((int)($args['equipment_id'] ?? 0));
+            case 'config_get':         return static::configGet((int)($args['equipment_id'] ?? 0), (bool)($args['include_params'] ?? false));
             case 'get_geofences':      return static::getGeofences((int)($args['equipment_id'] ?? 0));
             default:                   throw new Exception("Unknown tool: {$name}");
         }
@@ -172,7 +173,7 @@ class JeedomConnectMcpExtension {
         ];
     }
 
-    private static function configGet(int $equipmentId): array {
+    private static function configGet(int $equipmentId, bool $includeParams = false): array {
         static::loadClass();
         $eq     = static::getEqLogic($equipmentId);
         $config = $eq->getConfig();
@@ -202,12 +203,20 @@ class JeedomConnectMcpExtension {
             $parentId = $w['parentId'] ?? null;
             if ($parentId === null || !isset($sections[$parentId])) continue;
             $enriched = $widget_map[$w['widgetId'] ?? $w['id']] ?? $w;
-            $sections[$parentId]['widgets'][] = [
+            $entry = [
                 'id'    => $w['widgetId'] ?? $w['id'],
                 'type'  => $enriched['type'] ?? null,
                 'name'  => $enriched['name'] ?? null,
                 'index' => $w['index'] ?? 0,
             ];
+            if ($includeParams) {
+                // Include all raw fields except structural ones already exposed
+                $skip = ['widgetId', 'id', 'type', 'name', 'index', 'parentId'];
+                foreach ($w as $k => $v) {
+                    if (!in_array($k, $skip, true)) $entry[$k] = $v;
+                }
+            }
+            $sections[$parentId]['widgets'][] = $entry;
         }
 
         // Sort widgets by index within each section

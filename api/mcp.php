@@ -256,6 +256,17 @@ function mcp_get_tools(): array {
             ],
         ],
         [
+            'name'        => 'device_get_commands',
+            'description' => 'List all commands (info and action) for a given equipment with their IDs, names, types, and subTypes. Use this to find command IDs needed to bind widgets in JeedomConnect (e.g. state, on, off commands).',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'equipment_id' => ['type' => 'integer', 'description' => 'Equipment ID (from devices_list).'],
+                ],
+                'required' => ['equipment_id'],
+            ],
+        ],
+        [
             'name'        => 'device_get_history',
             'description' => 'Query the history of a device command (sensor values, power consumption, states…). Use devices_list with include_historical=true to discover command names available for history queries.',
             'inputSchema' => [
@@ -662,6 +673,7 @@ function mcp_call_tool(string $name, array $args): array {
             case 'device_set_description': return tool_result(tool_device_set_description((int)($args['equipment_id'] ?? 0), (string)($args['description'] ?? '')));
             case 'device_update':       return tool_result(tool_device_update((int)($args['equipment_id'] ?? 0), $args));
             case 'device_delete':       return tool_result(tool_device_delete((int)($args['equipment_id'] ?? 0)));
+            case 'device_get_commands': return tool_result(tool_device_get_commands((int)($args['equipment_id'] ?? 0)));
             case 'device_get_history':  return tool_result(tool_device_get_history($args['equipment_id'] ?? null, $args['command_name'] ?? null, $args['start'] ?? null, $args['end'] ?? null, $args['aggregate'] ?? 'stats', $args['group_by'] ?? 'day'));
             case 'devices_states':      return tool_result(tool_devices_states($args['equipment_ids'] ?? null, $args['categories'] ?? null, $args['room_ids'] ?? null));
             case 'command_execute':     return tool_result(tool_command_execute($args['commands'] ?? []));
@@ -833,7 +845,8 @@ function tool_acl_list(): array {
     $tool_map = [
         'devices_list'             => ['devices',    'read'],
         'devices_states'           => ['devices',    'read'],
-        'device_get_history'              => ['devices',    'read'],
+        'device_get_commands'      => ['devices',    'read'],
+        'device_get_history'       => ['devices',    'read'],
         'command_execute'          => ['devices',    'execution'],
         'device_set_description'   => ['devices',    'set_description'],
         'device_update'            => ['devices',    'update'],
@@ -1033,6 +1046,23 @@ function tool_devices_states(?array $equipment_ids, ?array $categories, ?array $
         $result[] = ['id' => $id, 'state' => fmt_state_map($commands_by_eq[$id] ?? [])];
     }
     return $result;
+}
+
+function tool_device_get_commands(int $equipment_id): array {
+    acl_check('devices', 'read');
+    $eq = eqLogic::byId($equipment_id);
+    if (!is_object($eq)) throw new Exception("Equipment {$equipment_id} not found");
+
+    $commands = [];
+    foreach ($eq->getCmd() as $cmd) {
+        $commands[] = [
+            'id'      => (int) $cmd->getId(),
+            'name'    => $cmd->getName(),
+            'type'    => $cmd->getType(),
+            'subType' => $cmd->getSubType(),
+        ];
+    }
+    return ['equipment_id' => $equipment_id, 'commands' => $commands];
 }
 
 function tool_device_get_history($raw_equipment_id, $raw_command_name, ?string $start, ?string $end, string $aggregate, string $group_by): array {
