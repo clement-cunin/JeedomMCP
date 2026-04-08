@@ -1019,3 +1019,81 @@ Apply a pending update for Jeedom core or a plugin. Use `updates_list` first to 
   "applied": true
 }
 ```
+
+---
+
+## `messages_list`
+
+List all messages currently in the Jeedom message center (plugin errors, Z-Wave failures, update notices, etc.).
+
+> **ACL**: `messages.read` — accessible from `read_execute` mode and above.
+
+**Parameters**: none
+
+**Returns**:
+
+```json
+{
+  "messages": [
+    {
+      "id": 42,
+      "type": "openzwave",
+      "message": "Node 7 is dead",
+      "action": null,
+      "logical_id": null,
+      "date": "2026-04-08 10:23:00"
+    }
+  ],
+  "count": 1
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `id` | Message ID — use with `message_remove` |
+| `type` | Source plugin or system component |
+| `message` | Human-readable alert text |
+| `action` | Optional URL or action string attached to the message |
+| `logical_id` | Optional plugin-internal identifier |
+| `date` | Timestamp when the message was created |
+
+---
+
+## `message_remove`
+
+Acknowledge (remove) a single message from the Jeedom message center.
+
+> **ACL**: `messages.execution` — accessible from `read_execute` mode and above.
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `message_id` | integer | yes | Message ID obtained from `messages_list` |
+
+**Returns**:
+
+```json
+{
+  "success": true,
+  "removed_id": 42
+}
+```
+
+---
+
+## `message_remove_all`
+
+Acknowledge (remove) all messages from the Jeedom message center at once.
+
+> **ACL**: `messages.execution` — accessible from `read_execute` mode and above.
+
+**Parameters**: none
+
+**Returns**:
+
+```json
+{
+  "success": true
+}
+```
