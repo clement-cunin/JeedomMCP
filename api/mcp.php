@@ -623,6 +623,27 @@ function mcp_get_tools(): array {
             ],
         ],
         [
+            'name'        => 'messages_list',
+            'description' => 'List all messages in the Jeedom message center (alerts, plugin errors, Z-Wave failures, etc.).',
+            'inputSchema' => ['type' => 'object', 'properties' => new stdClass(), 'required' => []],
+        ],
+        [
+            'name'        => 'message_remove',
+            'description' => 'Acknowledge (remove) a single message from the Jeedom message center by its ID.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'message_id' => ['type' => 'integer', 'description' => 'Message ID obtained from messages_list.'],
+                ],
+                'required' => ['message_id'],
+            ],
+        ],
+        [
+            'name'        => 'message_remove_all',
+            'description' => 'Acknowledge (remove) all messages from the Jeedom message center at once.',
+            'inputSchema' => ['type' => 'object', 'properties' => new stdClass(), 'required' => []],
+        ],
+        [
             'name'        => 'scenario_create',
             'description' => 'Create a new Jeedom scenario.',
             'inputSchema' => [
@@ -692,6 +713,9 @@ function mcp_call_tool(string $name, array $args): array {
             case 'log_read':            return tool_result(tool_log_read((string)($args['log'] ?? ''), intval($args['lines'] ?? 100), intval($args['offset'] ?? 0), $args['min_level'] ?? null, $args['search'] ?? null));
             case 'updates_list':        return tool_result(tool_updates_list());
             case 'update_apply':        return tool_result(tool_update_apply((string)($args['logical_id'] ?? '')));
+            case 'messages_list':       return tool_result(tool_messages_list());
+            case 'message_remove':      return tool_result(tool_message_remove((int)($args['message_id'] ?? 0)));
+            case 'message_remove_all':  return tool_result(tool_message_remove_all());
             default:
                 if (strncmp($name, 'ext_', 4) === 0) return ext_call_tool($name, $args);
                 return tool_error('Unknown tool: ' . $name);
@@ -865,6 +889,9 @@ function tool_acl_list(): array {
         'log_read'                 => ['admin_logs',    'read'],
         'updates_list'             => ['admin_system',  'read'],
         'update_apply'             => ['admin_system',  'update'],
+        'messages_list'            => ['messages',      'read'],
+        'message_remove'           => ['messages',      'execution'],
+        'message_remove_all'       => ['messages',      'execution'],
     ];
 
     $authorized = ['acl_list']; // always accessible
@@ -1719,4 +1746,35 @@ function tool_update_apply(string $logical_id): array {
     if ($u->getStatus() !== 'update') throw new Exception("'{$logical_id}' has no pending update (status: " . $u->getStatus() . ')');
     $u->doUpdate();
     return ['logical_id' => $logical_id, 'applied' => true];
+}
+
+function tool_messages_list(): array {
+    acl_check('messages', 'read');
+    $messages = [];
+    foreach (message::all() as $msg) {
+        $messages[] = [
+            'id'         => intval($msg->getId()),
+            'type'       => $msg->getType() ?? '',
+            'message'    => $msg->getMessage() ?? '',
+            'action'     => $msg->getAction() ?: null,
+            'logical_id' => $msg->getLogicalId() ?: null,
+            'date'       => $msg->getDate() ?? '',
+        ];
+    }
+    return ['messages' => $messages, 'count' => count($messages)];
+}
+
+function tool_message_remove(int $message_id): array {
+    acl_check('messages', 'execution');
+    if ($message_id <= 0) throw new Exception('message_id is required');
+    $msg = message::byId($message_id);
+    if (!is_object($msg)) throw new Exception("No message found with id {$message_id}");
+    $msg->remove();
+    return ['success' => true, 'removed_id' => $message_id];
+}
+
+function tool_message_remove_all(): array {
+    acl_check('messages', 'execution');
+    message::removeAll();
+    return ['success' => true];
 }
