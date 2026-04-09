@@ -695,7 +695,11 @@ function mcp_call_tool(string $name, array $args): array {
             case 'scenario_run':        return tool_result(tool_scenario_run((int)($args['scenario_id'] ?? 0)));
             case 'scenario_delete':     return tool_result(tool_scenario_delete((int)($args['scenario_id'] ?? 0)));
             case 'scenario_get_actions': return tool_result(tool_scenario_get_actions((int)($args['scenario_id'] ?? 0)));
-            case 'scenario_set_actions': return tool_result(tool_scenario_set_actions((int)($args['scenario_id'] ?? 0), $args['elements'] ?? []));
+            case 'scenario_set_actions': {
+                $elements = $args['elements'] ?? [];
+                if (is_string($elements)) $elements = json_decode($elements, true) ?? [];
+                return tool_result(tool_scenario_set_actions((int)($args['scenario_id'] ?? 0), $elements));
+            }
             case 'scenario_set_description': return tool_result(tool_scenario_set_description((int)($args['scenario_id'] ?? 0), (string)($args['description'] ?? '')));
             case 'scenario_update':     return tool_result(tool_scenario_update($args));
             case 'scenario_create':     return tool_result(tool_scenario_create($args));
