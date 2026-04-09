@@ -1786,7 +1786,7 @@ function tool_messages_list(): array {
     foreach (message::all() as $msg) {
         $messages[] = [
             'id'         => intval($msg->getId()),
-            'type'       => $msg->getType() ?? '',
+            'plugin'     => $msg->getPlugin() ?? '',
             'message'    => $msg->getMessage() ?? '',
             'action'     => $msg->getAction() ?: null,
             'logical_id' => $msg->getLogicalId() ?: null,

@@ -1045,7 +1045,7 @@ List all messages currently in the Jeedom message center (plugin errors, Z-Wave 
   "messages": [
     {
       "id": 42,
-      "type": "openzwave",
+      "plugin": "openzwave",
       "message": "Node 7 is dead",
       "action": null,
       "logical_id": null,
@@ -1059,7 +1059,7 @@ List all messages currently in the Jeedom message center (plugin errors, Z-Wave 
 | Field | Description |
 |-------|-------------|
 | `id` | Message ID — use with `message_remove` |
-| `type` | Source plugin or system component |
+| `plugin` | Source plugin or system component |
 | `message` | Human-readable alert text |
 | `action` | Optional URL or action string attached to the message |
 | `logical_id` | Optional plugin-internal identifier |
