@@ -475,9 +475,16 @@ Gets the full action blocks of a Jeedom scenario (elements, sub-elements, expres
           "expressions": [
             {
               "type": "action",
+              "expression": "#857#",
+              "options": { "enable": "1", "background": "0" },
+              "order": "0",
+              "warning": "Command not found — this action may be broken"
+            },
+            {
+              "type": "action",
               "expression": "#[Entrée][Couloir][Mode Jour]#",
               "options": { "enable": "1", "background": "0" },
-              "order": "0"
+              "order": "1"
             }
           ]
         }
@@ -493,6 +500,7 @@ Gets the full action blocks of a Jeedom scenario (elements, sub-elements, expres
 | `subElements` | Action or condition groups within a block |
 | `expressions` | Individual actions or conditions within a group |
 | `expression` | Jeedom tag (`#[room][device][cmd]#`), code snippet, or condition |
+| `warning` | Present only when the expression references a command ID (`#857#`) that no longer exists in Jeedom |
 
 ---
 

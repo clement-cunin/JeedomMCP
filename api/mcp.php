@@ -1277,6 +1277,36 @@ function tool_scenario_delete(int $scenario_id): array {
     return ['success' => true, 'scenario_id' => $scenario_id];
 }
 
+function annotate_orphaned_commands(array &$elements): void {
+    foreach ($elements as &$element) {
+        if (isset($element['subElements']) && is_array($element['subElements'])) {
+            foreach ($element['subElements'] as &$subElement) {
+                if (isset($subElement['expressions']) && is_array($subElement['expressions'])) {
+                    foreach ($subElement['expressions'] as &$expr) {
+                        if (!empty($expr['expression'])) {
+                            $val = (string)$expr['expression'];
+                            if (preg_match_all('/#(\d+)#/', $val, $matches)) {
+                                foreach ($matches[1] as $cmd_id) {
+                                    if (!is_object(cmd::byId((int)$cmd_id))) {
+                                        $expr['warning'] = 'Command not found — this action may be broken';
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    unset($expr);
+                }
+                if (isset($subElement['elements']) && is_array($subElement['elements'])) {
+                    annotate_orphaned_commands($subElement['elements']);
+                }
+            }
+            unset($subElement);
+        }
+    }
+    unset($element);
+}
+
 function tool_scenario_get_actions(int $scenario_id): array {
     acl_check('scenarios', 'read');
     $s = scenario::byId($scenario_id);
@@ -1287,7 +1317,9 @@ function tool_scenario_get_actions(int $scenario_id): array {
     if (!is_array($export)) {
         return ['error' => "Could not export scenario {$scenario_id}"];
     }
-    return ['scenario_id' => $scenario_id, 'elements' => $export['elements'] ?? []];
+    $elements = $export['elements'] ?? [];
+    annotate_orphaned_commands($elements);
+    return ['scenario_id' => $scenario_id, 'elements' => $elements];
 }
 
 function tool_scenario_set_actions(int $scenario_id, array $elements): array {
