@@ -1363,7 +1363,7 @@ function tool_scenario_update(array $args): array {
     if (isset($args['mode']))        $s->setMode($args['mode']);
     if (isset($args['schedule']))    $s->setSchedule($args['schedule']);
     if (isset($args['trigger']))     $s->setTrigger($args['trigger']);
-    if (isset($args['is_active']))   $s->setIsActive($args['is_active'] ? 1 : 0);
+    if (array_key_exists('is_active', $args)) $s->setIsActive(filter_var($args['is_active'], FILTER_VALIDATE_BOOLEAN) ? 1 : 0);
     if (isset($args['description'])) $s->setDescription($args['description']);
     $s->save();
     return fmt_scenario($s);
@@ -1380,7 +1380,7 @@ function tool_scenario_create(array $args): array {
     $s = new scenario();
     $s->setName($name);
     $s->setMode($mode);
-    $s->setIsActive(isset($args['is_active']) ? ($args['is_active'] ? 1 : 0) : 1);
+    $s->setIsActive(array_key_exists('is_active', $args) ? (filter_var($args['is_active'], FILTER_VALIDATE_BOOLEAN) ? 1 : 0) : 1);
     $s->setDescription($args['description'] ?? '');
     if (isset($args['schedule'])) $s->setSchedule($args['schedule']);
     if (isset($args['trigger']))  $s->setTrigger($args['trigger']);
