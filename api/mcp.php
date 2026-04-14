@@ -297,7 +297,7 @@ function mcp_get_tools(): array {
         ],
         [
             'name'        => 'command_execute',
-            'description' => 'Execute one or more action commands with optional per-command values. Use {id, value} for a single command, {ids, value} to share a value across several commands.',
+            'description' => 'Execute one or more action commands with optional per-command values. Use {id, value} for a single command, {ids, value} to share a value across several commands. Returns {"success": true} on success. To read updated device states after execution, use devices_states.',
             'inputSchema' => [
                 'type'       => 'object',
                 'properties' => [
@@ -1131,7 +1131,6 @@ function tool_command_execute(array $commands): array {
     acl_check('devices', 'execution');
     if (empty($commands)) throw new Exception('commands is required');
 
-    $affected_eq = [];
     foreach ($commands as $entry) {
         $ids     = isset($entry['ids']) ? (array)$entry['ids'] : [(int)($entry['id'] ?? 0)];
         $value   = $entry['value'] ?? null;
@@ -1140,17 +1139,10 @@ function tool_command_execute(array $commands): array {
             $cmd = cmd::byId($command_id);
             if (!is_object($cmd)) throw new Exception("Command {$command_id} not found");
             $cmd->execCmd($options);
-            $eq_id = intval($cmd->getEqLogic_id());
-            if (!isset($affected_eq[$eq_id])) $affected_eq[$eq_id] = true;
         }
     }
 
-    $result = [];
-    foreach (array_keys($affected_eq) as $eq_id) {
-        $cmds     = cmd::byEqLogicId($eq_id);
-        $result[] = ['id' => $eq_id, 'state' => fmt_state_map($cmds)];
-    }
-    return $result;
+    return ['success' => true];
 }
 
 function tool_rooms_list(int $limit = 50, int $offset = 0): array {
