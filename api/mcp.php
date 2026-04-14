@@ -272,6 +272,18 @@ function mcp_get_tools(): array {
             ],
         ],
         [
+            'name'        => 'device_get_commands',
+            'description' => 'Return all commands (info and action) for a given equipment, with their IDs, names, types, and subTypes.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'equipment_id' => ['type' => 'integer', 'description' => 'Equipment ID obtained from devices_list.'],
+                    'type'         => ['type' => 'string',  'description' => 'Filter by command type. Omit to return all commands.', 'enum' => ['info', 'action']],
+                ],
+                'required' => ['equipment_id'],
+            ],
+        ],
+        [
             'name'        => 'devices_states',
             'description' => 'Bulk refresh the state of equipment. Provide equipment_ids for specific devices, or use categories/room_ids to match devices without prior discovery. Returns {id, state} per device.',
             'inputSchema' => [
@@ -684,6 +696,7 @@ function mcp_call_tool(string $name, array $args): array {
             case 'device_update':       return tool_result(tool_device_update((int)($args['equipment_id'] ?? 0), $args));
             case 'device_delete':       return tool_result(tool_device_delete((int)($args['equipment_id'] ?? 0)));
             case 'device_get_history':  return tool_result(tool_device_get_history($args['equipment_id'] ?? null, $args['command_name'] ?? null, $args['start'] ?? null, $args['end'] ?? null, $args['aggregate'] ?? 'stats', $args['group_by'] ?? 'day'));
+            case 'device_get_commands': return tool_result(tool_device_get_commands((int)($args['equipment_id'] ?? 0), $args['type'] ?? null));
             case 'devices_states':      return tool_result(tool_devices_states($args['equipment_ids'] ?? null, $args['categories'] ?? null, $args['room_ids'] ?? null));
             case 'command_execute':     return tool_result(tool_command_execute($args['commands'] ?? []));
             case 'rooms_list':          return tool_result(tool_rooms_list(intval($args['limit'] ?? 50), intval($args['offset'] ?? 0)));
@@ -862,6 +875,7 @@ function tool_acl_list(): array {
         'devices_list'             => ['devices',    'read'],
         'devices_states'           => ['devices',    'read'],
         'device_get_history'              => ['devices',    'read'],
+        'device_get_commands'      => ['devices',    'read'],
         'command_execute'          => ['devices',    'execution'],
         'device_set_description'   => ['devices',    'set_description'],
         'device_update'            => ['devices',    'update'],
@@ -978,6 +992,23 @@ function fmt_equipment(eqLogic $eq): array {
     if (!empty($cats))                            $item['categories']  = $cats;
     if ($eq->getIsVisible() != 1)                 $item['is_visible']  = false;
     return $item;
+}
+
+function tool_device_get_commands(int $equipment_id, ?string $type = null): array {
+    acl_check('devices', 'read');
+    $eq = eqLogic::byId($equipment_id);
+    if (!is_object($eq)) throw new Exception("Equipment {$equipment_id} not found");
+    $commands = [];
+    foreach ($eq->getCmd() as $cmd) {
+        if ($type !== null && $cmd->getType() !== $type) continue;
+        $commands[] = [
+            'id'      => intval($cmd->getId()),
+            'name'    => $cmd->getName() ?? '',
+            'type'    => $cmd->getType() ?? '',
+            'subType' => $cmd->getSubType() ?? '',
+        ];
+    }
+    return ['equipment_id' => $equipment_id, 'commands' => $commands];
 }
 
 function tool_device_set_description(int $equipment_id, string $description): array {
