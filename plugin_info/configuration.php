@@ -38,6 +38,7 @@ $acl_matrix = [
     'rooms'      => ['read' => true, 'execution' => false, 'set_description' => true, 'create' => true, 'update' => true, 'delete' => true],
     'scenarios'  => ['read' => true, 'execution' => true, 'set_description' => true, 'create' => true, 'update' => true, 'delete' => true],
     'admin_plugins' => ['read' => true, 'execution' => true, 'set_description' => false, 'create' => true,  'update' => true, 'delete' => true],
+    'admin_plugin_secrets' => ['read' => true, 'execution' => false, 'set_description' => false, 'create' => false, 'update' => true, 'delete' => false],
     'admin_logs'    => ['read' => true, 'execution' => false, 'set_description' => false, 'create' => false, 'update' => false, 'delete' => false],
     'admin_system'  => ['read' => true, 'execution' => false, 'set_description' => false, 'create' => false, 'update' => true,  'delete' => false],
 ];
@@ -49,7 +50,7 @@ $acl_defaults = [
 ];
 
 // Initialize acl_mode default
-if (!in_array((string)config::byKey('acl_mode', 'jeedomMCP'), ['read_execute', 'read_execute_describe', 'full', 'full_admin', 'custom'], true)) {
+if (!in_array((string)config::byKey('acl_mode', 'jeedomMCP'), ['read_execute', 'read_execute_describe', 'full', 'full_admin', 'full_admin_secrets', 'custom'], true)) {
     config::save('acl_mode', 'read_execute', 'jeedomMCP');
 }
 
@@ -70,6 +71,7 @@ $acl_domain_labels = [
     'rooms'      => '{{Rooms}}',
     'scenarios'  => '{{Scenarios}}',
     'admin_plugins' => '{{Admin — Plugins}}',
+    'admin_plugin_secrets' => '{{Admin — Plugin Secrets}}',
     'admin_logs'    => '{{Admin — Logs}}',
     'admin_system'  => '{{Admin — System}}',
 ];
@@ -106,11 +108,15 @@ $acl_tools = [
         'delete'          => ['scenario_delete'],
     ],
     'admin_plugins' => [
-        'read'   => ['plugins_list', 'plugin_get_config', 'plugin_market_list'],
+        'read'   => ['plugins_list', 'plugin_market_list'],
         'create' => ['plugin_install'],
         'execution' => ['plugin_dependency_install', 'plugin_daemon_action'],
-        'update' => ['plugin_set_active', 'plugin_set_config'],
+        'update' => ['plugin_set_active'],
         'delete' => ['plugin_uninstall'],
+    ],
+    'admin_plugin_secrets' => [
+        'read'   => ['plugin_get_config'],
+        'update' => ['plugin_set_config'],
     ],
     'admin_logs' => [
         'read' => ['logs_list', 'log_read'],
@@ -169,10 +175,20 @@ $acl_tools = [
                     <option value="read_execute_describe">{{Read, Execute &amp; Set description}}</option>
                     <option value="full">{{Full access}}</option>
                     <option value="full_admin">{{Full access + Admin}}</option>
+                    <option value="full_admin_secrets">⚠️ {{Full access + Admin + Secret Management}}</option>
                     <option value="custom">{{Custom}}</option>
                 </select>
             </div>
             <span class="help-block col-sm-4">{{In Custom mode, permissions are checked per operation using the table below.}}</span>
+        </div>
+
+        <div id="acl_secrets_warning" class="form-group" style="display:none">
+            <div class="col-sm-offset-4 col-sm-8">
+                <div class="alert alert-warning" style="margin-bottom:0">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>{{Security warning}}</strong> — {{This mode grants access to sensitive plugin configuration including passwords, private keys, and API credentials. Only use this with fully trusted MCP clients over a secured connection.}}
+                </div>
+            </div>
         </div>
 
         <div class="form-group">
@@ -188,8 +204,13 @@ $acl_tools = [
                     </thead>
                     <tbody>
                         <?php foreach ($acl_matrix as $domain => $ops): ?>
-                        <tr<?php echo (strncmp($domain, 'admin', 5) === 0) ? ' data-admin="1"' : ''; ?>>
-                            <th style="vertical-align:top;padding-top:10px"><?php echo $acl_domain_labels[$domain]; ?></th>
+                        <tr<?php echo (strncmp($domain, 'admin', 5) === 0) ? ' data-admin="1"' : ''; ?><?php echo ($domain === 'admin_plugin_secrets') ? ' data-secrets="1"' : ''; ?>>
+                            <th style="vertical-align:top;padding-top:10px">
+                                <?php echo $acl_domain_labels[$domain]; ?>
+                                <?php if ($domain === 'admin_plugin_secrets'): ?>
+                                <div><small class="text-warning" style="font-weight:normal">⚠️ {{Grants access to sensitive plugin configuration (passwords, certificates, API keys). Only enable for fully trusted clients.}}</small></div>
+                                <?php endif; ?>
+                            </th>
                             <?php foreach (array_keys($acl_op_labels) as $op): ?>
                             <td class="text-center">
                                 <?php if (!empty($ops[$op])): ?>
@@ -320,7 +341,9 @@ var mcpJsonPollInterval = setInterval(function () {
         updateMcpJsonPreview();
         clearInterval(mcpJsonPollInterval);
         // Config values are fully loaded — apply table state based on mode
-        applyAclMode($('#acl_mode').val());
+        var _mode = $('#acl_mode').val();
+        applyAclMode(_mode);
+        $('#acl_secrets_warning').toggle(_mode === 'full_admin_secrets');
     }
 }, 100);
 
@@ -370,13 +393,15 @@ var ACL_MODE_OPS = {
     read_execute:          ['read', 'execution'],
     read_execute_describe: ['read', 'execution', 'set_description'],
     full:                  ['read', 'execution', 'set_description', 'create', 'update', 'delete'],
-    full_admin:            ['read', 'execution', 'set_description', 'create', 'update', 'delete']
+    full_admin:            ['read', 'execution', 'set_description', 'create', 'update', 'delete'],
+    full_admin_secrets:    ['read', 'execution', 'set_description', 'create', 'update', 'delete']
 };
 
 function applyAclMode(mode) {
-    var isCustom    = (mode === 'custom');
-    var isFullAdmin = (mode === 'full_admin');
-    var isFull      = (mode === 'full' || isFullAdmin);
+    var isCustom           = (mode === 'custom');
+    var isFullAdminSecrets = (mode === 'full_admin_secrets');
+    var isFullAdmin        = (mode === 'full_admin' || isFullAdminSecrets);
+    var isFull             = (mode === 'full' || isFullAdmin);
     $('#acl_table_wrapper').css({
         'opacity':        isCustom ? '1'    : '0.5',
         'pointer-events': isCustom ? 'auto' : 'none'
@@ -384,19 +409,26 @@ function applyAclMode(mode) {
     if (!isCustom) {
         var ops = ACL_MODE_OPS[mode] || [];
         $('.acl-checkbox').each(function () {
-            var $tr       = $(this).closest('tr');
-            var isAdminRow = $tr.data('admin') === 1;
-            var isExtRow   = $tr.data('ext') === 1;
+            var $tr          = $(this).closest('tr');
+            var isAdminRow   = $tr.data('admin') === 1;
+            var isSecretsRow = $tr.data('secrets') === 1;
+            var isExtRow     = $tr.data('ext') === 1;
+            var checked;
             if (isExtRow) {
-                $(this).prop('checked', isFull);
+                checked = isFull;
+            } else if (isSecretsRow) {
+                checked = isFullAdminSecrets && ops.indexOf($(this).data('op')) !== -1;
             } else {
-                $(this).prop('checked', (!isAdminRow || isFullAdmin) && ops.indexOf($(this).data('op')) !== -1);
+                checked = (!isAdminRow || isFullAdmin) && ops.indexOf($(this).data('op')) !== -1;
             }
+            $(this).prop('checked', checked);
         });
     }
 }
 
 $('#acl_mode').on('change', function () {
-    applyAclMode($(this).val());
+    var mode = $(this).val();
+    applyAclMode(mode);
+    $('#acl_secrets_warning').toggle(mode === 'full_admin_secrets');
 });
 </script>

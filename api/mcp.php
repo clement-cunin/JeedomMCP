@@ -75,15 +75,16 @@ function tool_error(string $message): array {
 function acl_allowed(string $domain, string $operation): bool {
     $mode = config::byKey('acl_mode', 'jeedomMCP', 'read_execute');
 
-    // Extension domains: accessible only in full/full_admin or custom (never in presets)
+    // Extension domains: accessible only in full/full_admin/full_admin_secrets or custom (never in presets)
     if (strncmp($domain, 'ext_', 4) === 0) {
-        if ($mode === 'full_admin' || $mode === 'full') return true;
+        if ($mode === 'full_admin_secrets' || $mode === 'full_admin' || $mode === 'full') return true;
         if ($mode === 'custom') return config::byKey("acl_{$domain}_{$operation}", 'jeedomMCP', '0') == 1;
         return false;
     }
 
     switch ($mode) {
-        case 'full_admin': return true;
+        case 'full_admin_secrets': return true;
+        case 'full_admin': return $domain !== 'admin_plugin_secrets';
         case 'full':       return strncmp($domain, 'admin', 5) !== 0;
         case 'read_execute_describe':
             return in_array($operation, ['read', 'execution', 'set_description']);
@@ -880,12 +881,12 @@ function tool_acl_list(): array {
         'scenario_set_actions'     => ['scenarios',  'update'],
         'scenario_delete'          => ['scenarios',  'delete'],
         'plugins_list'             => ['admin_plugins', 'read'],
-        'plugin_get_config'        => ['admin_plugins', 'read'],
+        'plugin_get_config'        => ['admin_plugin_secrets', 'read'],
         'plugin_market_list'       => ['admin_plugins', 'read'],
         'plugin_install'           => ['admin_plugins', 'create'],
         'plugin_uninstall'         => ['admin_plugins', 'delete'],
         'plugin_set_active'        => ['admin_plugins', 'update'],
-        'plugin_set_config'        => ['admin_plugins', 'update'],
+        'plugin_set_config'        => ['admin_plugin_secrets', 'update'],
         'plugin_set_plugin_config'  => ['admin_plugins', 'update'],
         'plugin_dependency_install' => ['admin_plugins', 'execution'],
         'plugin_daemon_action'     => ['admin_plugins', 'execution'],
@@ -1450,7 +1451,7 @@ function plugin_log_level_name(string $plugin_id): string {
 }
 
 function tool_plugin_get_config(string $plugin_id): array {
-    acl_check('admin_plugins', 'read');
+    acl_check('admin_plugin_secrets', 'read');
     if ($plugin_id === '') throw new Exception('plugin_id is required');
     $plugin = plugin::byId($plugin_id);
     if (!is_object($plugin)) throw new Exception('Plugin not found: ' . $plugin_id);
@@ -1508,7 +1509,7 @@ function tool_plugin_get_config(string $plugin_id): array {
 }
 
 function tool_plugin_set_config(string $plugin_id, ?string $log_level, ?bool $daemon_auto_restart, ?bool $dependency_auto_install = null): array {
-    acl_check('admin_plugins', 'update');
+    acl_check('admin_plugin_secrets', 'update');
     if ($plugin_id === '') throw new Exception('plugin_id is required');
     $plugin = plugin::byId($plugin_id);
     if (!is_object($plugin)) throw new Exception('Plugin not found: ' . $plugin_id);
