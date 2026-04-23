@@ -8,6 +8,87 @@ For the extension system documentation, see [mcp-plugin-extension.md](mcp-plugin
 
 ---
 
+## weather (Open-Meteo)
+
+### `ext_weather_current`
+
+Get current weather conditions at the configured home location or a given place. Calls Open-Meteo directly — no Jeedom Weather plugin required, no API key needed. Falls back to the Jeedom system location (Administration → Configuration → Localisation) when no location is provided.
+
+> **ACL**: `ext_weather.execution`
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `location` | string | no | City name (e.g. `"Paris"`) or `"lat,lon"` (e.g. `"48.85,2.35"`). Defaults to Jeedom system location. |
+
+**Returns**:
+
+```json
+{
+  "location": { "lat": 47.32, "lon": 5.04, "name": "Dijon, France" },
+  "time": "2026-04-23T14:30",
+  "condition": "Partly cloudy",
+  "weather_code": 2,
+  "temperature": 18.4,
+  "feels_like": 17.1,
+  "humidity": 52,
+  "wind_speed": 14.2,
+  "wind_gusts": 22.0,
+  "wind_direction": 270,
+  "precipitation": 0.0,
+  "uv_index": 4.2,
+  "pressure": 1015.3,
+  "sunrise": "2026-04-23T06:24",
+  "sunset": "2026-04-23T20:51",
+  "units": { "temperature": "°C", "wind_speed": "km/h", "precipitation": "mm", "pressure": "hPa" }
+}
+```
+
+Throws if no location is provided and no home location is configured in Jeedom.
+
+---
+
+### `ext_weather_forecast`
+
+Get a daily weather forecast for the next 1–7 days. Same location resolution as `ext_weather_current`.
+
+> **ACL**: `ext_weather.execution`
+
+**Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `location` | string | no | City name or `"lat,lon"`. Defaults to Jeedom system location. |
+| `days` | integer | no | Number of days to forecast (1–7). Defaults to 4. |
+
+**Returns**:
+
+```json
+{
+  "location": { "lat": 47.32, "lon": 5.04, "name": "Dijon, France" },
+  "units": { "temperature": "°C", "precipitation": "mm", "wind_speed": "km/h" },
+  "forecast": [
+    {
+      "date": "2026-04-23",
+      "condition": "Partly cloudy",
+      "weather_code": 2,
+      "temperature_max": 21.0,
+      "temperature_min": 10.5,
+      "precipitation": 0.0,
+      "precipitation_probability": 5,
+      "wind_speed_max": 18.3,
+      "wind_gusts_max": 30.1,
+      "uv_index_max": 5.0,
+      "sunrise": "2026-04-23T06:24",
+      "sunset": "2026-04-23T20:51"
+    }
+  ]
+}
+```
+
+---
+
 ## MerosSync
 
 ### `ext_MerosSync_sync`
