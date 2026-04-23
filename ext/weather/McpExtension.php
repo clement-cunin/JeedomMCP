@@ -203,9 +203,17 @@ class weatherMcpExtension {
             ];
         }
 
-        // Fall back to Jeedom system location
-        $lat = config::byKey('latitude');
-        $lon = config::byKey('longitude');
+        // Fall back to Jeedom system location.
+        // Jeedom stores location under 'info::latitude' (4.x) or 'latitude' (older).
+        $lat  = config::byKey('info::latitude');
+        $lon  = config::byKey('info::longitude');
+        $city = config::byKey('info::name');
+
+        if (($lat === '' || $lat === null) && ($lon === '' || $lon === null)) {
+            $lat  = config::byKey('latitude');
+            $lon  = config::byKey('longitude');
+            $city = config::byKey('name');
+        }
 
         if ($lat === '' || $lon === '' || $lat === null || $lon === null) {
             throw new Exception(
@@ -214,7 +222,6 @@ class weatherMcpExtension {
             );
         }
 
-        $city = config::byKey('name');
         return [
             'lat'  => (float)$lat,
             'lon'  => (float)$lon,
