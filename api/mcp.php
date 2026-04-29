@@ -188,7 +188,7 @@ function mcp_get_tools(): array {
     $tools = [
         [
             'name'        => 'devices_list',
-            'description' => 'List all enabled Jeedom equipment with their current state and available actions. Use with_plugin_info=true to also get managed_by (plugin name, e.g. "openzwave") and plugin_id (plugin-internal identifier, e.g. the Z-Wave node ID). Use include_state=false or include_actions=false to reduce response size when only metadata is needed.',
+            'description' => 'List Jeedom equipment with their current state and available actions. By default only enabled devices are returned — use include_inactive=true to also include disabled ones. Use with_plugin_info=true to also get managed_by (plugin name, e.g. "openzwave") and plugin_id (plugin-internal identifier, e.g. the Z-Wave node ID). Use include_state=false or include_actions=false to reduce response size when only metadata is needed.',
             'inputSchema' => [
                 'type'       => 'object',
                 'properties' => [
@@ -205,6 +205,7 @@ function mcp_get_tools(): array {
                     'managed_by'         => ['type' => 'string',  'description' => 'Filter by plugin name (e.g. "openzwave"). Only used when with_plugin_info=true.'],
                     'with_plugin_info'   => ['type' => 'boolean', 'description' => 'If true, include managed_by (plugin name) and plugin_id (plugin-internal identifier) for each device. Default false.'],
                     'include_hidden'     => ['type' => 'boolean', 'description' => 'Include devices hidden in the Jeedom UI (is_visible=false). Default false.'],
+                    'include_inactive'   => ['type' => 'boolean', 'description' => 'Include disabled devices (is_active=false). When true, each inactive device has is_active=false in the response. Default false.'],
                     'include_state'      => ['type' => 'boolean', 'description' => 'Include the state map for each device (default true).'],
                     'include_actions'    => ['type' => 'boolean', 'description' => 'Include the actions array for each device (default true).'],
                     'include_historical' => ['type' => 'boolean', 'description' => 'Include an "available_historical" array listing the names of historized info commands. Use these names with device_get_history(equipment_id, command_name). Default false.'],
@@ -692,7 +693,7 @@ function mcp_call_tool(string $name, array $args): array {
     try {
         switch ($name) {
             case 'acl_list':            return tool_result(tool_acl_list());
-            case 'devices_list':        return tool_result(tool_devices_list($args['categories'] ?? null, $args['room_ids'] ?? null, intval($args['limit'] ?? 50), intval($args['offset'] ?? 0), isset($args['include_state']) ? (bool)$args['include_state'] : true, isset($args['include_actions']) ? (bool)$args['include_actions'] : true, isset($args['include_hidden']) ? (bool)$args['include_hidden'] : false, isset($args['include_historical']) ? (bool)$args['include_historical'] : false, isset($args['with_plugin_info']) ? (bool)$args['with_plugin_info'] : false, isset($args['managed_by']) ? (string)$args['managed_by'] : null));
+            case 'devices_list':        return tool_result(tool_devices_list($args['categories'] ?? null, $args['room_ids'] ?? null, intval($args['limit'] ?? 50), intval($args['offset'] ?? 0), isset($args['include_state']) ? (bool)$args['include_state'] : true, isset($args['include_actions']) ? (bool)$args['include_actions'] : true, isset($args['include_hidden']) ? (bool)$args['include_hidden'] : false, isset($args['include_historical']) ? (bool)$args['include_historical'] : false, isset($args['with_plugin_info']) ? (bool)$args['with_plugin_info'] : false, isset($args['managed_by']) ? (string)$args['managed_by'] : null, isset($args['include_inactive']) ? (bool)$args['include_inactive'] : false));
             case 'device_set_description': return tool_result(tool_device_set_description((int)($args['equipment_id'] ?? 0), (string)($args['description'] ?? '')));
             case 'device_update':       return tool_result(tool_device_update((int)($args['equipment_id'] ?? 0), $args));
             case 'device_delete':       return tool_result(tool_device_delete((int)($args['equipment_id'] ?? 0)));
@@ -929,7 +930,7 @@ function tool_acl_list(): array {
     return ['mode' => $mode, 'authorized_tools' => $authorized];
 }
 
-function tool_devices_list(?array $categories = null, ?array $room_ids = null, int $limit = 50, int $offset = 0, bool $include_state = true, bool $include_actions = true, bool $include_hidden = false, bool $include_historical = false, bool $with_plugin_info = false, ?string $managed_by = null): array {
+function tool_devices_list(?array $categories = null, ?array $room_ids = null, int $limit = 50, int $offset = 0, bool $include_state = true, bool $include_actions = true, bool $include_hidden = false, bool $include_historical = false, bool $with_plugin_info = false, ?string $managed_by = null, bool $include_inactive = false): array {
     acl_check('devices', 'read');
 
     $room_ids_int = null;
@@ -946,16 +947,17 @@ function tool_devices_list(?array $categories = null, ?array $room_ids = null, i
 
     $all = [];
     foreach (eqLogic::all() as $eq) {
-        if ($eq->getIsEnable() != 1) continue;
+        if (!$include_inactive && $eq->getIsEnable() != 1) continue;
         if (!$include_hidden && $eq->getIsVisible() != 1) continue;
         $eq_cats = active_categories($eq->getCategory());
         if (!empty($categories) && empty(array_intersect($categories, $eq_cats))) continue;
         if ($room_ids_int !== null && !in_array(intval($eq->getObject_id()), $room_ids_int, true)) continue;
         $item = ['id' => intval($eq->getId()), 'name' => $eq->getName() ?? ''];
-        if ($eq->getComment())      $item['description'] = $eq->getComment();
-        if ($eq->getObject_id())    $item['room_id']     = intval($eq->getObject_id());
-        if (!empty($eq_cats))       $item['categories']  = $eq_cats;
-        if ($eq->getIsVisible() != 1) $item['is_visible'] = false;
+        if ($eq->getComment())        $item['description'] = $eq->getComment();
+        if ($eq->getObject_id())      $item['room_id']     = intval($eq->getObject_id());
+        if (!empty($eq_cats))         $item['categories']  = $eq_cats;
+        if ($eq->getIsVisible() != 1) $item['is_visible']  = false;
+        if ($eq->getIsEnable() != 1)  $item['is_active']   = false;
         if ($with_plugin_info) {
             $eq_plugin = $eq->getEqType_name();
             if ($managed_by !== null && $eq_plugin !== $managed_by) continue;
