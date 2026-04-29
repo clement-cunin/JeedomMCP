@@ -124,6 +124,8 @@ Updates a device's metadata. Only provided fields are modified.
 | `name` | string | no | New display name |
 | `room_id` | int | no | Room ID to assign the device to (`0` to unassign) |
 | `categories` | string[] | no | Category keys — replaces all existing categories. Valid values: `heating`, `security`, `energy`, `light`, `opening`, `automatism`, `multimedia`, `default` |
+| `is_visible` | bool | no | Whether the device is visible in the Jeedom UI |
+| `is_active` | bool | no | Whether the device is enabled. Set to `false` to disable, `true` to re-enable |
 
 **Returns**: updated equipment object
 

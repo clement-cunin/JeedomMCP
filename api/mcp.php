@@ -229,7 +229,7 @@ function mcp_get_tools(): array {
         ],
         [
             'name'        => 'device_update',
-            'description' => 'Update a device\'s metadata: name, room assignment, categories, and/or visibility. Only provided fields are modified.',
+            'description' => 'Update a device\'s metadata: name, room assignment, categories, visibility, and/or active state. Only provided fields are modified.',
             'inputSchema' => [
                 'type'       => 'object',
                 'properties' => [
@@ -242,6 +242,7 @@ function mcp_get_tools(): array {
                         'items'       => ['type' => 'string', 'enum' => ['heating', 'security', 'energy', 'light', 'opening', 'automatism', 'multimedia', 'default']],
                     ],
                     'is_visible'   => ['type' => 'boolean', 'description' => 'Whether the device is visible in the Jeedom UI. Set to true to show a newly synced device.'],
+                    'is_active'    => ['type' => 'boolean', 'description' => 'Whether the device is enabled in Jeedom. Set to false to disable, true to re-enable.'],
                 ],
                 'required' => ['equipment_id'],
             ],
@@ -994,6 +995,7 @@ function fmt_equipment(eqLogic $eq): array {
     $cats = active_categories($eq->getCategory());
     if (!empty($cats))                            $item['categories']  = $cats;
     if ($eq->getIsVisible() != 1)                 $item['is_visible']  = false;
+    if ($eq->getIsEnable() != 1)                  $item['is_active']   = false;
     return $item;
 }
 
@@ -1058,6 +1060,9 @@ function tool_device_update(int $equipment_id, array $args): array {
     }
     if (array_key_exists('is_visible', $args)) {
         $eq->setIsVisible((bool)$args['is_visible'] ? 1 : 0);
+    }
+    if (array_key_exists('is_active', $args)) {
+        $eq->setIsEnable((bool)$args['is_active'] ? 1 : 0);
     }
     $eq->save();
     return fmt_equipment($eq);
