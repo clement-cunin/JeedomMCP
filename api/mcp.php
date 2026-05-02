@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * JeedomMCP - PHP MCP Server (streamable-http transport)
  *
