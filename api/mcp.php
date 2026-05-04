@@ -185,6 +185,9 @@ switch ($rpc_method) {
 // ---------------------------------------------------------------------------
 
 function mcp_get_tools(): array {
+    $tools = require __DIR__ . '/mcp_tools.php';
+
+    /* keep the old inline array below as a reference comment — delete once stable
     $tools = [
         [
             'name'        => 'devices_list',
@@ -312,20 +315,20 @@ function mcp_get_tools(): array {
         ],
         [
             'name'        => 'command_execute',
-            'description' => 'Execute one or more action commands with optional per-command values. Use {id, value} for a single command, {ids, value} to share a value across several commands. Returns {"success": true} on success. To read updated device states after execution, use devices_states.',
+            'description' => 'Execute one or more action commands with optional per-command values. Returns {"success": true} on success. To read updated device states after execution, use devices_states.',
             'inputSchema' => [
                 'type'       => 'object',
                 'properties' => [
                     'commands' => [
                         'type'        => 'array',
-                        'description' => 'List of commands to execute. Each entry has either "id" (int) or "ids" (int[]), plus an optional "value" string.',
+                        'description' => 'List of commands to execute. Each entry has an "id" (int) and an optional "value" string.',
                         'items'       => [
                             'type'       => 'object',
                             'properties' => [
-                                'id'    => ['type' => 'integer', 'description' => 'Single command ID.'],
-                                'ids'   => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'Multiple command IDs sharing the same value.'],
+                                'id'    => ['type' => 'integer', 'description' => 'Command ID.'],
                                 'value' => ['type' => 'string', 'description' => 'Value for slider, color or message subTypes.'],
                             ],
+                            'required' => ['id'],
                         ],
                     ],
                 ],
@@ -674,7 +677,7 @@ function mcp_get_tools(): array {
                 'required' => ['name', 'mode'],
             ],
         ],
-    ];
+    ]; */
 
     foreach (ext_discover() as $ext) {
         foreach ($ext['tools'] as $tool) {
@@ -1171,14 +1174,12 @@ function tool_command_execute(array $commands): array {
     if (empty($commands)) throw new Exception('commands is required');
 
     foreach ($commands as $entry) {
-        $ids     = isset($entry['ids']) ? (array)$entry['ids'] : [(int)($entry['id'] ?? 0)];
-        $value   = $entry['value'] ?? null;
-        $options = ($value !== null) ? ['slider' => $value] : [];
-        foreach ($ids as $command_id) {
-            $cmd = cmd::byId($command_id);
-            if (!is_object($cmd)) throw new Exception("Command {$command_id} not found");
-            $cmd->execCmd($options);
-        }
+        $command_id = (int)($entry['id'] ?? 0);
+        $value      = $entry['value'] ?? null;
+        $options    = ($value !== null) ? ['slider' => $value] : [];
+        $cmd = cmd::byId($command_id);
+        if (!is_object($cmd)) throw new Exception("Command {$command_id} not found");
+        $cmd->execCmd($options);
     }
 
     return ['success' => true];
