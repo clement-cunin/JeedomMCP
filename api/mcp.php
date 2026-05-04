@@ -864,11 +864,15 @@ function fmt_actions(array $cmds): array {
     $actions = [];
     foreach ($cmds as $cmd) {
         if ($cmd->getType() !== 'action') continue;
-        $actions[] = [
-            'id'      => intval($cmd->getId()),
-            'name'    => $cmd->getName() ?? '',
-            'subType' => $cmd->getSubType() ?? 'other',
+        $entry = [
+            'id'   => intval($cmd->getId()),
+            'name' => $cmd->getName() ?? '',
         ];
+        $subType = $cmd->getSubType() ?? 'other';
+        if ($subType !== 'other') {
+            $entry['subType'] = $subType;
+        }
+        $actions[] = $entry;
     }
     return $actions;
 }
