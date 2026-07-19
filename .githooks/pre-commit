@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+#
+# Pre-commit hook: lint staged PHP files with `php -l` and block the commit
+# if any of them fails to compile.
+#
+# Activation (once per clone):
+#   git config core.hooksPath .githooks
+#
+# Why php -l only (no PHPStan/Psalm): this repo has no composer.json / vendor
+# dependency management (Jeedom plugins ship as plain PHP, no autoloader).
+# Requiring a static analyser would mean every contributor (human or agent)
+# must first run `composer install`, and the hook would silently do nothing
+# — or worse, fail every commit — for anyone who hasn't. `php -l` needs
+# nothing beyond the PHP binary that is already required to work on this
+# project, so it is the dependable floor. Revisit this if the project ever
+# adopts composer for real dependencies.
+
+set -uo pipefail
+
+php_bin=$(command -v php)
+if [ -z "$php_bin" ]; then
+    echo "pre-commit: 'php' introuvable dans le PATH, lint PHP ignore." >&2
+    exit 0
+fi
+
+status=0
+while IFS= read -r -d '' file; do
+    [ -f "$file" ] || continue
+    if ! output=$("$php_bin" -l "$file" 2>&1); then
+        echo "$output" >&2
+        status=1
+    fi
+done < <(git diff --cached --name-only --diff-filter=ACM -z -- '*.php')
+
+if [ "$status" -ne 0 ]; then
+    echo >&2
+    echo "pre-commit: erreurs de syntaxe PHP detectees, commit annule." >&2
+    exit 1
+fi
+
+exit 0

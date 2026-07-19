@@ -9,6 +9,14 @@ A Jeedom plugin that exposes an [MCP (Model Context Protocol)](https://modelcont
 - [MCP tools reference](docs/mcp-tools.md)
 - [Development guide](docs/development.md)
 
+## Contributing
+
+Before committing, check that `core.hooksPath` points to `.githooks`
+(`git config core.hooksPath`); if not, enable it with
+`git config core.hooksPath .githooks`. This activates a pre-commit hook
+that lints staged PHP files with `php -l` and blocks the commit if one
+fails to compile.
+
 ## License
 
 AGPL-3.0
