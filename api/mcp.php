@@ -764,6 +764,18 @@ function ext_find_file(string $plugin_id): ?string {
     return null;
 }
 
+/**
+ * Lints a PHP file with `php -l` before it gets require_once'd.
+ * A fatal compile error (e.g. a redefined class constant) in a plugin's
+ * McpExtension.php is NOT catchable via try/catch — it aborts the whole
+ * script before the catch block can run. Linting first lets us skip the
+ * offending plugin instead of crashing the entire MCP request.
+ */
+function ext_lint_file(string $file, ?array &$output = null): bool {
+    exec('php -l ' . escapeshellarg($file) . ' 2>&1', $output, $code);
+    return $code === 0;
+}
+
 function ext_discover(): array {
     $extensions = [];
     ob_start();
@@ -773,10 +785,19 @@ function ext_discover(): array {
         $plugin_id = $plugin->getId();
         $file = ext_find_file($plugin_id);
         if ($file === null) continue;
+        if (!ext_lint_file($file, $lint_output)) {
+            log::add('jeedomMCP', 'error', "Extension MCP du plugin {$plugin_id} ignorée : erreur de syntaxe dans {$file} — " . implode("\n", $lint_output));
+            continue;
+        }
         require_once $file;
         $class = $plugin_id . 'McpExtension';
         if (!class_exists($class)) continue;
-        $tools = $class::getTools();
+        try {
+            $tools = $class::getTools();
+        } catch (\Throwable $e) {
+            log::add('jeedomMCP', 'error', "Extension MCP du plugin {$plugin_id} : erreur dans getTools() — " . $e->getMessage());
+            continue;
+        }
         if (!is_array($tools) || empty($tools)) continue;
         $extensions[] = ['plugin_id' => $plugin_id, 'class' => $class, 'tools' => $tools];
     }
@@ -795,11 +816,20 @@ function ext_call_tool(string $name, array $args): array {
 
     $file = ext_find_file($plugin_id);
     if ($file === null) return tool_error("Extension not found for plugin: {$plugin_id}");
+    if (!ext_lint_file($file, $lint_output)) {
+        log::add('jeedomMCP', 'error', "Extension MCP du plugin {$plugin_id} ignorée : erreur de syntaxe dans {$file} — " . implode("\n", $lint_output));
+        return tool_error("Extension du plugin {$plugin_id} indisponible (erreur de syntaxe)");
+    }
     require_once $file;
     $class = $plugin_id . 'McpExtension';
     if (!class_exists($class)) return tool_error("Extension class not found: {$class}");
 
-    return tool_result($class::callTool($tool_name, $args));
+    try {
+        return tool_result($class::callTool($tool_name, $args));
+    } catch (\Throwable $e) {
+        log::add('jeedomMCP', 'error', "Extension MCP du plugin {$plugin_id} : erreur dans callTool({$tool_name}) — " . $e->getMessage());
+        return tool_error("Erreur lors de l'exécution de l'outil {$name}: " . $e->getMessage());
+    }
 }
 
 // ---------------------------------------------------------------------------
