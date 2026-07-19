@@ -13,5 +13,9 @@ venv/
 # IDE, OS, environment, local config (all dotfiles/dotdirs)
 .*
 
+# ...except versioned git hooks
+!.githooks
+!.githooks/**
+
 # Dev tools (local only)
 deploy.sh
