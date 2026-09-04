@@ -253,16 +253,14 @@ Each entry in `commands` supports:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | int | Single command ID |
-| `ids` | int[] | Multiple command IDs sharing the same value |
+| `id` | int | Command ID (required) |
 | `value` | string | Value for `slider`, `color`, `message` subTypes (optional) |
-
-Use `id` for a single command, `ids` to apply the same value to several commands at once.
 
 ```json
 {
   "commands": [
-    { "ids": [796, 823], "value": "30" },
+    { "id": 796, "value": "30" },
+    { "id": 823, "value": "30" },
     { "id": 778 },
     { "id": 831, "value": "80" }
   ]
