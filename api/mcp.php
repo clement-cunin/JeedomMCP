@@ -1728,10 +1728,15 @@ function tool_plugin_set_active(string $plugin_id, bool $active): array {
 // Admin — Logs
 // ---------------------------------------------------------------------------
 
-$LOG_LEVELS = ['DEBUG' => 0, 'INFO' => 1, 'WARNING' => 2, 'ERROR' => 3, 'CRITICAL' => 4];
+// Declared as a function (hoisted at compile time) rather than a top-level
+// variable: the request is dispatched before this line is reached, so a
+// global assigned here would still be null when the log tools run.
+function log_levels(): array {
+    return ['DEBUG' => 0, 'INFO' => 1, 'WARNING' => 2, 'ERROR' => 3, 'CRITICAL' => 4];
+}
 
 function log_max_level(string $path): ?string {
-    global $LOG_LEVELS;
+    $LOG_LEVELS = log_levels();
     $max = -1;
     $max_name = null;
     $handle = fopen($path, 'r');
@@ -1784,7 +1789,7 @@ function tool_logs_list(): array {
 }
 
 function tool_log_read(string $log, int $lines = 100, int $offset = 0, ?string $min_level = null, ?string $search = null): array {
-    global $LOG_LEVELS;
+    $LOG_LEVELS = log_levels();
     acl_check('admin_logs', 'read');
     if ($log === '') throw new Exception('log is required');
     $path = log::getPathToLog($log);
@@ -1798,8 +1803,7 @@ function tool_log_read(string $log, int $lines = 100, int $offset = 0, ?string $
     }
     $all = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     if ($min_rank >= 0) {
-        $all = array_values(array_filter($all, function ($line) use ($min_rank) {
-            global $LOG_LEVELS;
+        $all = array_values(array_filter($all, function ($line) use ($min_rank, $LOG_LEVELS) {
             if (preg_match('/\[(DEBUG|INFO|WARNING|ERROR|CRITICAL)\]/i', $line, $m)) {
                 return $LOG_LEVELS[strtoupper($m[1])] >= $min_rank;
             }
