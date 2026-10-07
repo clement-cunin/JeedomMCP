@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Fix `log_read` `min_level` filter and `logs_list` `max_level` (always `null`): `$LOG_LEVELS` was undefined when the log tools ran, which also emitted one PHP warning per log line into `http.error`
 - Pure PHP MCP server (`streamable-http` transport, no daemon)
 - Full device toolset: `devices_list`, `devices_states`, `command_execute`, `device_set_description`
 - Full room toolset: `rooms_list`, `room_create`, `room_update`, `room_delete`, `room_set_description`
